@@ -12,4 +12,4 @@
 --stripunusedargs closure-only
 --header strip
 
---exclude .build,build,DerivedData,Packages,**/Generated
+--exclude .build,build,DerivedData,**/.build,Packages/*/.build,**/Generated

@@ -2,7 +2,8 @@ excluded:
   - .build
   - build
   - DerivedData
-  - Packages
+  - "**/.build"
+  - "Packages/*/.build"
   - "**/Generated"
 
 disabled_rules:
