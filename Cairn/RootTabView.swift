@@ -12,9 +12,10 @@ struct RootTabView: View {
 
             TimelineView()
                 .tabItem {
-                    Label("Timeline", systemImage: "clock")
+                    Label("Path", systemImage: "mountain.2.fill")
                 }
         }
+        .tint(.cairnAccent)
     }
 }
 

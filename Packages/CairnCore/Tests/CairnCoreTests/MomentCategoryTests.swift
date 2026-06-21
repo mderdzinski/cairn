@@ -30,7 +30,7 @@ struct MomentCategoryTests {
 
     @Test("all five hindrances are present")
     func hindrancesExist() {
-        let hindrances: Set<MomentCategory> = [.desire, .aversion, .restlessness, .sluggishness, .doubt]
+        let hindrances: Set<MomentCategory> = [.desire, .aversion, .restlessness, .heaviness, .doubt]
         #expect(hindrances.isSubset(of: Set(MomentCategory.allCases)))
     }
 

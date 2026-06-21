@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Spectral-Light.ttf</string>
+		<string>Spectral-LightItalic.ttf</string>
+		<string>Spectral-Regular.ttf</string>
+		<string>Spectral-Medium.ttf</string>
+		<string>Spectral-SemiBold.ttf</string>
+		<string>Spectral-Bold.ttf</string>
+		<string>HankenGrotesk-Variable.ttf</string>
+		<string>SplineSansMono-Variable.ttf</string>
+	</array>
+</dict>
+</plist>

@@ -5,24 +5,86 @@ import UIKit
 
 struct CaptureView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var justCaptured: MomentCategory?
+    @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
+
+    private var todaysMomentCount: Int {
+        allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
+    }
 
     private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: CairnSpacing.size3),
+        GridItem(.flexible(), spacing: CairnSpacing.size3),
+        GridItem(.flexible(), spacing: CairnSpacing.size3),
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: CairnSpacing.size8)
+                grid
+                Spacer(minLength: CairnSpacing.size6)
+                footer
+            }
+            .padding(.horizontal, CairnSpacing.gutter)
+            .padding(.bottom, CairnSpacing.size6)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: CairnSpacing.size2) {
+            Text(eyebrowDate)
+                .font(.cairnEyebrow)
+                .tracking(CairnTracking.eyebrowCaps)
+                .foregroundStyle(Color.cairnTextTertiary)
+                .textCase(.uppercase)
+            Text("How is it,\nright now?")
+                .font(.cairnDisplay)
+                .tracking(CairnTracking.displayTight)
+                .foregroundStyle(Color.cairnTextPrimary)
+                .lineSpacing(-4)
+        }
+    }
+
+    private var grid: some View {
+        LazyVGrid(columns: columns, spacing: CairnSpacing.size6) {
             ForEach(MomentCategory.allCases, id: \.self) { category in
-                CaptureButton(
-                    category: category,
-                    isFlashing: justCaptured == category,
-                    action: { capture(category) }
-                )
+                MomentChip(category: category) {
+                    capture(category)
+                }
             }
         }
-        .padding()
+    }
+
+    private var footer: some View {
+        HStack(spacing: CairnSpacing.size3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stoneCountLine)
+                    .font(.cairnLabel)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.cairnTextPrimary)
+                Text("Reflect on them this evening.")
+                    .font(.cairnBody)
+                    .foregroundStyle(Color.cairnTextSecondary)
+            }
+            Spacer()
+        }
+        .padding(CairnSpacing.size4)
+        .background(Color.cairnBgSunken)
+        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.card))
+    }
+
+    private var eyebrowDate: String {
+        let weekday = Date.now.formatted(.dateTime.weekday(.wide))
+        let monthDay = Date.now.formatted(.dateTime.month(.abbreviated).day())
+        return "\(weekday) · \(monthDay)"
+    }
+
+    private var stoneCountLine: String {
+        let count = todaysMomentCount
+        return "\(count) \(count == 1 ? "stone" : "stones") today"
     }
 
     private func capture(_ category: MomentCategory) {
@@ -31,32 +93,6 @@ struct CaptureView: View {
 
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-
-        withAnimation(.easeOut(duration: 0.15)) {
-            justCaptured = category
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            withAnimation(.easeIn(duration: 0.2)) {
-                justCaptured = nil
-            }
-        }
-    }
-}
-
-private struct CaptureButton: View {
-    let category: MomentCategory
-    let isFlashing: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(category.displayName)
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 100)
-                .background(isFlashing ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
     }
 }
 
