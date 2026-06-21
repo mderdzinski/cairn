@@ -5,7 +5,7 @@ public enum MomentCategory: String, Codable, CaseIterable, Sendable {
     case desire
     case aversion
     case restlessness
-    case sluggishness
+    case heaviness
     case doubt
 
     public var displayName: String {
@@ -14,7 +14,7 @@ public enum MomentCategory: String, Codable, CaseIterable, Sendable {
         case .desire: "Desire"
         case .aversion: "Aversion"
         case .restlessness: "Restlessness"
-        case .sluggishness: "Sluggishness"
+        case .heaviness: "Heaviness"
         case .doubt: "Doubt"
         }
     }
@@ -25,8 +25,12 @@ public enum MomentCategory: String, Codable, CaseIterable, Sendable {
         case .desire: "Craving — a pull toward something."
         case .aversion: "Resistance or irritation."
         case .restlessness: "Agitation; can't quite settle."
-        case .sluggishness: "Dullness or mental fog."
+        case .heaviness: "Sloth and torpor; dullness."
         case .doubt: "Uncertainty or paralysis."
         }
+    }
+
+    public var assetName: String {
+        displayName
     }
 }
