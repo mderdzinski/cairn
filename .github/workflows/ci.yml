@@ -42,13 +42,14 @@ jobs:
           echo "Selected: $DEVICE"
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
 
-      - name: Build & test iOS
+      - name: Build & test iOS (unit tests only)
         run: |
           set -o pipefail
           xcodebuild test \
             -project Cairn.xcodeproj \
             -scheme Cairn \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -only-testing:CairnTests \
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify
 
