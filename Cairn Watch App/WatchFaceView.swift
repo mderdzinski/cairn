@@ -30,7 +30,7 @@ struct WatchFaceView: View {
 
             Button(action: onTapComplication) {
                 HStack(spacing: CairnSpacing.size2) {
-                    StoneStack(count: max(1, min(todayCount, 6)), size: .small)
+                    StoneStack(count: min(todayCount, 6), size: .small)
                     VStack(alignment: .leading, spacing: 0) {
                         Text("\(todayCount) today")
                             .font(.cairnLabel.weight(.semibold))

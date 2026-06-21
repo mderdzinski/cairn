@@ -26,12 +26,21 @@ public struct StoneStack: View {
     let crown: Bool
 
     public init(count: Int = 4, size: StoneSize = .medium, crown: Bool = true) {
-        self.count = max(1, min(6, count))
+        self.count = max(0, min(6, count))
         self.size = size
         self.crown = crown
     }
 
     public var body: some View {
+        // swiftlint:disable:next empty_count
+        if count == 0 {
+            EmptyView()
+        } else {
+            stack
+        }
+    }
+
+    private var stack: some View {
         let u = size.unit
         let baseW = StoneGeometry.baseW * u
         let stoneH = StoneGeometry.stoneH * u
@@ -39,7 +48,7 @@ public struct StoneStack: View {
         let viewW = baseW + StoneGeometry.viewboxPad * u
         let viewH = CGFloat(count) * stoneH + CGFloat(count - 1) * gap
 
-        Canvas { ctx, _ in
+        return Canvas { ctx, _ in
             for t in 0 ..< count {
                 let bottomIdx = (count - 1) - t
                 let w = baseW * (1 - StoneGeometry.taper * CGFloat(bottomIdx))

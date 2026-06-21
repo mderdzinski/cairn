@@ -4,12 +4,16 @@ import Testing
 
 @Suite("StoneStack")
 struct StoneStackTests {
-    @Test("count clamps to 1...6")
+    // swiftlint:disable empty_count
+    @Test("count clamps to 0...6")
     func clamps() {
-        #expect(StoneStack(count: 0).count == 1)
+        #expect(StoneStack(count: -1).count == 0)
+        #expect(StoneStack(count: 0).count == 0)
         #expect(StoneStack(count: 7).count == 6)
         #expect(StoneStack(count: 4).count == 4)
     }
+
+    // swiftlint:enable empty_count
 
     @Test("size unit values match design spec")
     func units() {

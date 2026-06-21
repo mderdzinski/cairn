@@ -10,7 +10,7 @@ struct WatchConfirmView: View {
     var body: some View {
         VStack(spacing: CairnSpacing.size3) {
             Spacer()
-            StoneStack(count: max(1, min(count, 6)), size: .medium)
+            StoneStack(count: min(count, 6), size: .medium)
                 .opacity(appeared ? 1 : 0)
                 .scaleEffect(appeared ? 1 : 0.9)
                 .offset(y: appeared ? 0 : 10)

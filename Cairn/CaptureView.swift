@@ -69,7 +69,7 @@ struct CaptureView: View {
 
     private var footer: some View {
         HStack(spacing: CairnSpacing.size3) {
-            StoneStack(count: max(1, min(todaysMomentCount, 6)), size: .small)
+            StoneStack(count: min(todaysMomentCount, 6), size: .small)
             VStack(alignment: .leading, spacing: 2) {
                 Text(stoneCountLine)
                     .font(.cairnLabel)
