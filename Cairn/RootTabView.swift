@@ -7,12 +7,12 @@ struct RootTabView: View {
         TabView {
             CaptureView()
                 .tabItem {
-                    Label("Capture", systemImage: "square.grid.2x2")
+                    Label("Capture", systemImage: "plus")
                 }
 
             TimelineView()
                 .tabItem {
-                    Label("Path", systemImage: "mountain.2.fill")
+                    Label("Path", systemImage: "mountain.2")
                 }
         }
         .tint(.cairnAccent)
