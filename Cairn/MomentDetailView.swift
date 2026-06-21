@@ -6,27 +6,45 @@ struct MomentDetailView: View {
     @Bindable var moment: Moment
 
     var body: some View {
-        Form {
-            Section {
-                Text(moment.category.displayName)
-                    .font(.largeTitle)
-                    .fontWeight(.semibold)
-                Text(moment.timestamp.formatted(date: .complete, time: .shortened))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            Form {
+                Section {
+                    VStack(alignment: .leading, spacing: CairnSpacing.size2) {
+                        Text(moment.category.displayName)
+                            .font(.cairnDisplay)
+                            .tracking(CairnTracking.displayTight)
+                            .foregroundStyle(Color.cairnTextPrimary)
+                        Text(moment.timestamp.formatted(date: .complete, time: .shortened))
+                            .font(.cairnMono)
+                            .foregroundStyle(Color.cairnTextSecondary)
+                    }
+                    .padding(.vertical, CairnSpacing.size1)
+                }
+                .listRowBackground(Color.cairnSurfaceCard)
 
-            Section("Reflection") {
-                TextField(
-                    "What were you thinking?",
-                    text: Binding(
-                        get: { moment.reflection ?? "" },
-                        set: { moment.reflection = $0.isEmpty ? nil : $0 }
-                    ),
-                    axis: .vertical
-                )
-                .lineLimit(3...)
+                Section {
+                    TextField(
+                        "Take your time…",
+                        text: Binding(
+                            get: { moment.reflection ?? "" },
+                            set: { moment.reflection = $0.isEmpty ? nil : $0 }
+                        ),
+                        axis: .vertical
+                    )
+                    .font(.cairnPrompt)
+                    .foregroundStyle(Color.cairnTextPrimary)
+                    .lineLimit(3...)
+                } header: {
+                    Text("Reflection")
+                        .font(.cairnEyebrow)
+                        .tracking(CairnTracking.eyebrowCaps)
+                        .foregroundStyle(Color.cairnTextTertiary)
+                        .textCase(.uppercase)
+                }
+                .listRowBackground(Color.cairnSurfaceCard)
             }
+            .scrollContentBackground(.hidden)
         }
         .navigationBarTitleDisplayMode(.inline)
     }

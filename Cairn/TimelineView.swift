@@ -8,30 +8,53 @@ struct TimelineView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if moments.isEmpty {
-                    ContentUnavailableView(
-                        "No moments yet",
-                        systemImage: "clock",
-                        description: Text("Capture your first moment to see it here.")
-                    )
-                } else {
-                    List {
-                        ForEach(groupedDays, id: \.self) { day in
-                            Section(sectionTitle(for: day)) {
-                                ForEach(grouped[day] ?? []) { moment in
-                                    NavigationLink {
-                                        MomentDetailView(moment: moment)
-                                    } label: {
-                                        row(for: moment)
-                                    }
-                                }
+            ZStack {
+                Color.cairnPaper.ignoresSafeArea()
+                content
+            }
+            .navigationTitle("Path")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Path")
+                        .font(.cairnTitle)
+                        .foregroundStyle(Color.cairnTextPrimary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if moments.isEmpty {
+            ContentUnavailableView(
+                "No moments yet",
+                systemImage: "mountain.2",
+                description: Text("Capture your first moment to see it here.")
+            )
+        } else {
+            List {
+                ForEach(groupedDays, id: \.self) { day in
+                    Section {
+                        ForEach(grouped[day] ?? []) { moment in
+                            NavigationLink {
+                                MomentDetailView(moment: moment)
+                            } label: {
+                                row(for: moment)
                             }
+                            .listRowBackground(Color.cairnSurfaceCard)
                         }
+                    } header: {
+                        Text(sectionTitle(for: day))
+                            .font(.cairnEyebrow)
+                            .tracking(CairnTracking.eyebrowCaps)
+                            .foregroundStyle(Color.cairnTextTertiary)
+                            .textCase(.uppercase)
                     }
                 }
             }
-            .navigationTitle("Timeline")
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -50,11 +73,15 @@ struct TimelineView: View {
     }
 
     private func row(for moment: Moment) -> some View {
-        HStack {
+        HStack(spacing: CairnSpacing.size3) {
+            CategoryDot(category: moment.category, size: 28)
             Text(moment.category.displayName)
+                .font(.cairnBody)
+                .foregroundStyle(Color.cairnTextPrimary)
             Spacer()
             Text(moment.timestamp.formatted(date: .omitted, time: .shortened))
-                .foregroundStyle(.secondary)
+                .font(.cairnMono)
+                .foregroundStyle(Color.cairnTextSecondary)
         }
     }
 }
