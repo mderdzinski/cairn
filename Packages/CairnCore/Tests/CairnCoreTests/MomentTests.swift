@@ -36,4 +36,23 @@ struct MomentTests {
         moment.category = .restlessness
         #expect(moment.categoryRaw == "restlessness")
     }
+
+    @Test("reflection defaults to nil")
+    func reflectionDefaultsToNil() {
+        let moment = Moment()
+        #expect(moment.reflection == nil)
+    }
+
+    @Test("reflection can be set at init")
+    func reflectionAtInit() {
+        let moment = Moment(category: .desire, reflection: "first draft")
+        #expect(moment.reflection == "first draft")
+    }
+
+    @Test("reflection is mutable after init")
+    func reflectionMutable() {
+        let moment = Moment()
+        moment.reflection = "added later"
+        #expect(moment.reflection == "added later")
+    }
 }
