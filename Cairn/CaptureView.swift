@@ -6,6 +6,8 @@ import UIKit
 struct CaptureView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
+    @State private var lastCaptured: MomentCategory?
+    @State private var toastTask: Task<Void, Never>?
 
     private var todaysMomentCount: Int {
         allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
@@ -30,6 +32,13 @@ struct CaptureView: View {
             }
             .padding(.horizontal, CairnSpacing.gutter)
             .padding(.bottom, CairnSpacing.size6)
+
+            if let category = lastCaptured {
+                MarkedToast(category: category)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 88)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
     }
 
@@ -90,9 +99,20 @@ struct CaptureView: View {
     private func capture(_ category: MomentCategory) {
         let moment = Moment(category: category)
         modelContext.insert(moment)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        toastTask?.cancel()
+        withAnimation(.easeOut(duration: 0.18)) {
+            lastCaptured = category
+        }
+        toastTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1300))
+            if !Task.isCancelled {
+                withAnimation(.easeIn(duration: 0.22)) {
+                    lastCaptured = nil
+                }
+            }
+        }
     }
 }
 
