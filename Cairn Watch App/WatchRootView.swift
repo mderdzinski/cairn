@@ -23,19 +23,19 @@ struct WatchRootView: View {
         Group {
             switch screen {
             case .face:
-                Text("Cairn")
-                    .font(.cairnTitle)
-                    .foregroundStyle(Color.cairnTextPrimary)
+                WatchFaceView(todayCount: todaysMomentCount) {
+                    withAnimation(.easeInOut(duration: 0.2)) { screen = .capture }
+                }
             case .capture:
-                Text("Capture")
-                    .font(.cairnTitle)
-            case .confirm:
-                Text("Confirmed")
-                    .font(.cairnTitle)
+                WatchCaptureView(
+                    onCapture: handleCapture,
+                    onClose: { withAnimation { screen = .face } }
+                )
+            case .confirm(let category):
+                WatchConfirmView(category: category, count: todaysMomentCount)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.cairnPaper)
+        .animation(.easeInOut(duration: 0.25), value: screen)
     }
 
     private func handleCapture(_ category: MomentCategory) {

@@ -1,11 +1,17 @@
-import CairnCore
 import SwiftUI
 
-struct CategoryDot: View {
-    let category: MomentCategory
-    var size: CGFloat = 32
-    var showsGlyph: Bool = false
-    var filled: Bool = false
+public struct CategoryDot: View {
+    public let category: MomentCategory
+    public var size: CGFloat
+    public var showsGlyph: Bool
+    public var filled: Bool
+
+    public init(category: MomentCategory, size: CGFloat = 32, showsGlyph: Bool = false, filled: Bool = false) {
+        self.category = category
+        self.size = size
+        self.showsGlyph = showsGlyph
+        self.filled = filled
+    }
 
     private var shouldShowGlyph: Bool {
         filled || showsGlyph
@@ -15,7 +21,7 @@ struct CategoryDot: View {
         size * (filled ? 0.66 : 0.62)
     }
 
-    var body: some View {
+    public var body: some View {
         Circle()
             .fill(CairnCategoryPalette.soft(category))
             .frame(width: size, height: size)
