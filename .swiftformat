@@ -1,0 +1,15 @@
+--swiftversion 5.9
+--indent 4
+--maxwidth 120
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--commas always
+--trimwhitespace always
+--ifdef no-indent
+--self remove
+--patternlet inline
+--stripunusedargs closure-only
+--header strip
+
+--exclude .build,build,DerivedData,Packages,**/Generated

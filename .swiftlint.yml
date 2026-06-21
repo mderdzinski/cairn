@@ -1,0 +1,46 @@
+excluded:
+  - .build
+  - build
+  - DerivedData
+  - Packages
+  - "**/Generated"
+
+disabled_rules:
+  - line_length
+  - file_length
+  - function_body_length
+  - type_body_length
+  - todo
+  - trailing_comma
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - last_where
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - yoda_condition
+  - force_unwrapping
+
+force_unwrapping:
+  severity: error
+
+force_cast:
+  severity: error
+
+force_try:
+  severity: error
+
+identifier_name:
+  excluded:
+    - id
+    - x
+    - y
+    - z
+    - to
+    - in
+    - on

@@ -1,10 +1,3 @@
-//
-//  CairnApp.swift
-//  Cairn
-//
-//  Created by Mark Derdzinski on 6/20/26.
-//
-
 import SwiftUI
 
 @main

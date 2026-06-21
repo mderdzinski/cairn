@@ -1,15 +1,7 @@
-//
-//  Cairn_Watch_AppUITestsLaunchTests.swift
-//  Cairn Watch AppUITests
-//
-//  Created by Mark Derdzinski on 6/20/26.
-//
-
 import XCTest
 
-final class Cairn_Watch_AppUITestsLaunchTests: XCTestCase {
-
-    override class var runsForEachTargetApplicationUIConfiguration: Bool {
+final class CairnWatchAppUITestsLaunchTests: XCTestCase {
+    override static var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }
 
@@ -18,7 +10,7 @@ final class Cairn_Watch_AppUITestsLaunchTests: XCTestCase {
     }
 
     @MainActor
-    func testLaunch() throws {
+    func testLaunch() {
         let app = XCUIApplication()
         app.launch()
 

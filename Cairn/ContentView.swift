@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  Cairn
-//
-//  Created by Mark Derdzinski on 6/20/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
