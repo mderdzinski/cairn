@@ -704,17 +704,8 @@
 				DEVELOPMENT_TEAM = UYL7L6V3VK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cairn-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cairn;
-				INFOPLIST_KEY_UIAppFonts = (
-					"Spectral-Light.ttf",
-					"Spectral-LightItalic.ttf",
-					"Spectral-Regular.ttf",
-					"Spectral-Medium.ttf",
-					"Spectral-SemiBold.ttf",
-					"Spectral-Bold.ttf",
-					"HankenGrotesk-Variable.ttf",
-					"SplineSansMono-Variable.ttf",
-				);
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -749,17 +740,8 @@
 				DEVELOPMENT_TEAM = UYL7L6V3VK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cairn-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Cairn;
-				INFOPLIST_KEY_UIAppFonts = (
-					"Spectral-Light.ttf",
-					"Spectral-LightItalic.ttf",
-					"Spectral-Regular.ttf",
-					"Spectral-Medium.ttf",
-					"Spectral-SemiBold.ttf",
-					"Spectral-Bold.ttf",
-					"HankenGrotesk-Variable.ttf",
-					"SplineSansMono-Variable.ttf",
-				);
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

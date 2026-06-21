@@ -4,7 +4,7 @@ import SwiftUI
 extension Color {
     static func fromOklch(_ lightness: Double, _ chroma: Double, _ hue: Double, alpha: Double = 1.0) -> Color {
         let rgb = oklchToCompandedSRGB(lightness: lightness, chroma: chroma, hue: hue)
-        return Color(.displayP3, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: alpha)
+        return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: alpha)
     }
 }
 

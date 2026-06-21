@@ -5,11 +5,10 @@ import UIKit
 
 struct CaptureView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var todaysMoments: [Moment]
+    @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
 
-    init() {
-        let startOfDay = Calendar.current.startOfDay(for: .now)
-        _todaysMoments = Query(filter: #Predicate<Moment> { $0.timestamp >= startOfDay })
+    private var todaysMomentCount: Int {
+        allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
     }
 
     private let columns = [
@@ -84,7 +83,7 @@ struct CaptureView: View {
     }
 
     private var stoneCountLine: String {
-        let count = todaysMoments.count
+        let count = todaysMomentCount
         return "\(count) \(count == 1 ? "stone" : "stones") today"
     }
 
