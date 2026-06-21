@@ -6,6 +6,7 @@ public final class Moment {
     public var id: UUID = UUID()
     public var timestamp: Date = Date()
     public var categoryRaw: String = MomentCategory.contentment.rawValue
+    public var reflection: String?
 
     public var category: MomentCategory {
         get { MomentCategory(rawValue: categoryRaw) ?? .contentment }
@@ -15,10 +16,12 @@ public final class Moment {
     public init(
         id: UUID = UUID(),
         timestamp: Date = Date(),
-        category: MomentCategory = .contentment
+        category: MomentCategory = .contentment,
+        reflection: String? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
         categoryRaw = category.rawValue
+        self.reflection = reflection
     }
 }
