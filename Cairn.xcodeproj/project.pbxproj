@@ -1027,6 +1027,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		EF6D14B52FE7832100390E66 /* CairnCore */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = EF6D14B42FE7832100390E66 /* XCLocalSwiftPackageReference "Packages/CairnCore" */;
 			productName = CairnCore;
 		};
 		EF6D14B82FE7836E00390E66 /* CairnCore */ = {
