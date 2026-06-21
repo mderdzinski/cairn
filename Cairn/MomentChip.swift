@@ -10,9 +10,10 @@ struct MomentChip: View {
             VStack(spacing: CairnSpacing.size2) {
                 ZStack {
                     Circle().fill(CairnCategoryPalette.soft(category))
-                    Image(systemName: placeholderSymbol(for: category))
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(CairnCategoryPalette.ink(category))
+                    Image(category.assetName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 44, height: 44)
                 }
                 .frame(width: 72, height: 72)
                 Text(category.displayName)
@@ -23,17 +24,6 @@ struct MomentChip: View {
         .buttonStyle(MomentChipButtonStyle())
         .accessibilityLabel(Text(category.displayName))
         .accessibilityHint(Text(category.summary))
-    }
-
-    private func placeholderSymbol(for category: MomentCategory) -> String {
-        switch category {
-        case .contentment: "leaf.fill"
-        case .desire: "flame.fill"
-        case .aversion: "shield.fill"
-        case .restlessness: "scribble.variable"
-        case .heaviness: "cloud.fill"
-        case .doubt: "questionmark.circle.fill"
-        }
     }
 }
 
