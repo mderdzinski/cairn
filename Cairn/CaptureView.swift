@@ -78,7 +78,7 @@ struct CaptureView: View {
 
     private var eyebrowDate: String {
         let weekday = Date.now.formatted(.dateTime.weekday(.wide))
-        let monthDay = Date.now.formatted(.dateTime.month(.abbreviated).day())
+        let monthDay = Date.now.formatted(.dateTime.month(.wide).day())
         return "\(weekday) · \(monthDay)"
     }
 
