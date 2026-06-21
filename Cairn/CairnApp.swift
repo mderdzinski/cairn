@@ -6,7 +6,7 @@ import SwiftUI
 struct CairnApp: App {
     var body: some Scene {
         WindowGroup {
-            CaptureView()
+            RootTabView()
         }
         .modelContainer(for: Moment.self)
     }
