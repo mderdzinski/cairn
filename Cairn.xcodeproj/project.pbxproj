@@ -10,6 +10,9 @@
 		EF4607CD2FE766530079402E /* Cairn Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = EF4607CC2FE766530079402E /* Cairn Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EF6D14B62FE7832100390E66 /* CairnCore in Frameworks */ = {isa = PBXBuildFile; productRef = EF6D14B52FE7832100390E66 /* CairnCore */; };
 		EF6D14B92FE7836E00390E66 /* CairnCore in Frameworks */ = {isa = PBXBuildFile; productRef = EF6D14B82FE7836E00390E66 /* CairnCore */; };
+		EFEE5C422FE918FD001AB2A1 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EFEE5C412FE918FD001AB2A1 /* WidgetKit.framework */; };
+		EFEE5C442FE918FD001AB2A1 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EFEE5C432FE918FD001AB2A1 /* SwiftUI.framework */; };
+		EFEE5C4F2FE91900001AB2A1 /* Cairn Watch WidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EFEE5C402FE918FD001AB2A1 /* Cairn Watch WidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +51,13 @@
 			remoteGlobalIDString = EF4607CB2FE766530079402E;
 			remoteInfo = "Cairn Watch App";
 		};
+		EFEE5C4D2FE91900001AB2A1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF4607A12FE766510079402E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EFEE5C3F2FE918FD001AB2A1;
+			remoteInfo = "Cairn Watch WidgetsExtension";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -62,6 +72,17 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EFEE5C542FE91900001AB2A1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				EFEE5C4F2FE91900001AB2A1 /* Cairn Watch WidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -71,6 +92,9 @@
 		EF4607CC2FE766530079402E /* Cairn Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cairn Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF4607DB2FE766540079402E /* Cairn Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cairn Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF4607E52FE766540079402E /* Cairn Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Cairn Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EFEE5C402FE918FD001AB2A1 /* Cairn Watch WidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Cairn Watch WidgetsExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EFEE5C412FE918FD001AB2A1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		EFEE5C432FE918FD001AB2A1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -80,6 +104,13 @@
 				"Cairn-Watch-App-Info.plist",
 			);
 			target = EF4607CB2FE766530079402E /* Cairn Watch App */;
+		};
+		EFEE5C532FE91900001AB2A1 /* Exceptions for "Cairn Watch Widgets" folder in "Cairn Watch WidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EFEE5C3F2FE918FD001AB2A1 /* Cairn Watch WidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -115,6 +146,14 @@
 		EF4607E82FE766540079402E /* Cairn Watch AppUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Cairn Watch AppUITests";
+			sourceTree = "<group>";
+		};
+		EFEE5C452FE918FD001AB2A1 /* Cairn Watch Widgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EFEE5C532FE91900001AB2A1 /* Exceptions for "Cairn Watch Widgets" folder in "Cairn Watch WidgetsExtension" target */,
+			);
+			path = "Cairn Watch Widgets";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -164,6 +203,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EFEE5C3D2FE918FD001AB2A1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EFEE5C442FE918FD001AB2A1 /* SwiftUI.framework in Frameworks */,
+				EFEE5C422FE918FD001AB2A1 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -176,6 +224,7 @@
 				EF4607D02FE766530079402E /* Cairn Watch App */,
 				EF4607DE2FE766540079402E /* Cairn Watch AppTests */,
 				EF4607E82FE766540079402E /* Cairn Watch AppUITests */,
+				EFEE5C452FE918FD001AB2A1 /* Cairn Watch Widgets */,
 				EF6D14B72FE7836E00390E66 /* Frameworks */,
 				EF4607AA2FE766510079402E /* Products */,
 			);
@@ -190,6 +239,7 @@
 				EF4607CC2FE766530079402E /* Cairn Watch App.app */,
 				EF4607DB2FE766540079402E /* Cairn Watch AppTests.xctest */,
 				EF4607E52FE766540079402E /* Cairn Watch AppUITests.xctest */,
+				EFEE5C402FE918FD001AB2A1 /* Cairn Watch WidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -197,6 +247,8 @@
 		EF6D14B72FE7836E00390E66 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				EFEE5C412FE918FD001AB2A1 /* WidgetKit.framework */,
+				EFEE5C432FE918FD001AB2A1 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -282,10 +334,12 @@
 				EF4607C82FE766530079402E /* Sources */,
 				EF4607C92FE766530079402E /* Frameworks */,
 				EF4607CA2FE766530079402E /* Resources */,
+				EFEE5C542FE91900001AB2A1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				EFEE5C4E2FE91900001AB2A1 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				EF4607D02FE766530079402E /* Cairn Watch App */,
@@ -344,6 +398,28 @@
 			productReference = EF4607E52FE766540079402E /* Cairn Watch AppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		EFEE5C3F2FE918FD001AB2A1 /* Cairn Watch WidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EFEE5C502FE91900001AB2A1 /* Build configuration list for PBXNativeTarget "Cairn Watch WidgetsExtension" */;
+			buildPhases = (
+				EFEE5C3C2FE918FD001AB2A1 /* Sources */,
+				EFEE5C3D2FE918FD001AB2A1 /* Frameworks */,
+				EFEE5C3E2FE918FD001AB2A1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				EFEE5C452FE918FD001AB2A1 /* Cairn Watch Widgets */,
+			);
+			name = "Cairn Watch WidgetsExtension";
+			packageProductDependencies = (
+			);
+			productName = "Cairn Watch WidgetsExtension";
+			productReference = EFEE5C402FE918FD001AB2A1 /* Cairn Watch WidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -376,6 +452,9 @@
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = EF4607CB2FE766530079402E;
 					};
+					EFEE5C3F2FE918FD001AB2A1 = {
+						CreatedOnToolsVersion = 26.5;
+					};
 				};
 			};
 			buildConfigurationList = EF4607A42FE766510079402E /* Build configuration list for PBXProject "Cairn" */;
@@ -401,6 +480,7 @@
 				EF4607CB2FE766530079402E /* Cairn Watch App */,
 				EF4607DA2FE766540079402E /* Cairn Watch AppTests */,
 				EF4607E42FE766540079402E /* Cairn Watch AppUITests */,
+				EFEE5C3F2FE918FD001AB2A1 /* Cairn Watch WidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -442,6 +522,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		EF4607E32FE766540079402E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EFEE5C3E2FE918FD001AB2A1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -493,6 +580,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EFEE5C3C2FE918FD001AB2A1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -520,6 +614,11 @@
 			isa = PBXTargetDependency;
 			target = EF4607CB2FE766530079402E /* Cairn Watch App */;
 			targetProxy = EF4607E62FE766540079402E /* PBXContainerItemProxy */;
+		};
+		EFEE5C4E2FE91900001AB2A1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EFEE5C3F2FE918FD001AB2A1 /* Cairn Watch WidgetsExtension */;
+			targetProxy = EFEE5C4D2FE91900001AB2A1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -974,6 +1073,73 @@
 			};
 			name = Release;
 		};
+		EFEE5C512FE91900001AB2A1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UYL7L6V3VK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cairn Watch Widgets/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Cairn Watch Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markderdzinski.Cairn.watchkitapp.Cairn-Watch-Widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		EFEE5C522FE91900001AB2A1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UYL7L6V3VK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cairn Watch Widgets/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Cairn Watch Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markderdzinski.Cairn.watchkitapp.Cairn-Watch-Widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1036,6 +1202,15 @@
 			buildConfigurations = (
 				EF4608002FE766540079402E /* Debug */,
 				EF4608012FE766540079402E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EFEE5C502FE91900001AB2A1 /* Build configuration list for PBXNativeTarget "Cairn Watch WidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EFEE5C512FE91900001AB2A1 /* Debug */,
+				EFEE5C522FE91900001AB2A1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
