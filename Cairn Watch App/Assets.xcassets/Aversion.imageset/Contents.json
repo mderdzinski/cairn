@@ -2,8 +2,7 @@
     "images": [
         {
             "filename": "aversion.png",
-            "idiom": "universal",
-            "scale": "3x"
+            "idiom": "universal"
         }
     ],
     "info": {
