@@ -3,8 +3,10 @@ import SwiftData
 import SwiftUI
 
 struct TimelineView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Moment.timestamp, order: .reverse)
     private var moments: [Moment]
+    @State private var reflectingMoment: Moment?
 
     var body: some View {
         NavigationStack {
@@ -20,6 +22,13 @@ struct TimelineView: View {
                         .font(.cairnTitle)
                         .foregroundStyle(Color.cairnTextPrimary)
                 }
+            }
+            .sheet(item: $reflectingMoment) { moment in
+                ReflectSheet(
+                    moment: moment,
+                    onDismiss: { reflectingMoment = nil },
+                    onDelete: { delete(moment) }
+                )
             }
         }
     }
@@ -37,12 +46,20 @@ struct TimelineView: View {
                 ForEach(groupedDays, id: \.self) { day in
                     Section {
                         ForEach(grouped[day] ?? []) { moment in
-                            NavigationLink {
-                                MomentDetailView(moment: moment)
+                            Button {
+                                reflectingMoment = moment
                             } label: {
                                 row(for: moment)
                             }
+                            .buttonStyle(.plain)
                             .listRowBackground(Color.cairnSurfaceCard)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    delete(moment)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     } header: {
                         Text(sectionTitle(for: day))
@@ -83,6 +100,13 @@ struct TimelineView: View {
                 .font(.cairnMono)
                 .foregroundStyle(Color.cairnTextSecondary)
         }
+    }
+
+    private func delete(_ moment: Moment) {
+        if reflectingMoment?.id == moment.id {
+            reflectingMoment = nil
+        }
+        modelContext.delete(moment)
     }
 }
 
