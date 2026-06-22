@@ -30,6 +30,7 @@ struct CairnCaptureLauncherView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 22, height: 22)
+                    .widgetAccentable()
                 Text("Capture a moment")
                     .font(.body)
                 Spacer(minLength: 0)
@@ -40,6 +41,7 @@ struct CairnCaptureLauncherView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .padding(4)
+                .widgetAccentable()
         }
     }
 }
