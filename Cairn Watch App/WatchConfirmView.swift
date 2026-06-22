@@ -3,25 +3,20 @@ import SwiftUI
 
 struct WatchConfirmView: View {
     let category: MomentCategory
-    let count: Int
 
     @State private var appeared = false
 
     var body: some View {
         VStack(spacing: CairnSpacing.size3) {
             Spacer()
-            StoneStack(count: min(count, 6), size: .medium)
+            CategoryDot(category: category, size: 72, filled: true)
                 .opacity(appeared ? 1 : 0)
-                .scaleEffect(appeared ? 1 : 0.9)
-                .offset(y: appeared ? 0 : 10)
-            Text("Marked")
-                .font(.cairnSerif(size: 22, weight: .light))
-                .foregroundStyle(Color.cairnTextPrimary)
-            HStack(spacing: CairnSpacing.size2) {
-                Image(category.assetName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
+                .scaleEffect(appeared ? 1 : 0.85)
+                .offset(y: appeared ? 0 : 8)
+            VStack(spacing: 2) {
+                Text("Marked")
+                    .font(.cairnSerif(size: 22, weight: .light))
+                    .foregroundStyle(Color.cairnTextPrimary)
                 Text(category.displayName)
                     .font(.cairnLabel.weight(.semibold))
                     .foregroundStyle(CairnCategoryPalette.ink(category))

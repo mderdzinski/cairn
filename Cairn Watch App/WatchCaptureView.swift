@@ -25,6 +25,7 @@ struct WatchCaptureView: View {
                         .background(Color.cairnStone100, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Text("Close"))
             }
 
             LazyVGrid(columns: columns, spacing: CairnSpacing.size2) {
@@ -35,6 +36,8 @@ struct WatchCaptureView: View {
                         CategoryDot(category: category, size: 46, filled: true)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Mark \(category.displayName)"))
+                    .accessibilityHint(Text(category.summary))
                 }
             }
 

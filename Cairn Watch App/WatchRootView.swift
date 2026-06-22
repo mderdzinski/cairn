@@ -4,7 +4,7 @@ import SwiftUI
 import WatchKit
 
 enum WatchScreen: Equatable {
-    case face
+    case home
     case capture
     case confirm(MomentCategory)
 }
@@ -12,7 +12,7 @@ enum WatchScreen: Equatable {
 struct WatchRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
-    @State private var screen: WatchScreen = .face
+    @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
 
     private var todaysMomentCount: Int {
@@ -22,17 +22,17 @@ struct WatchRootView: View {
     var body: some View {
         Group {
             switch screen {
-            case .face:
-                WatchFaceView(todayCount: todaysMomentCount) {
+            case .home:
+                WatchHomeView(todayCount: todaysMomentCount) {
                     withAnimation(.easeInOut(duration: 0.2)) { screen = .capture }
                 }
             case .capture:
                 WatchCaptureView(
                     onCapture: handleCapture,
-                    onClose: { withAnimation { screen = .face } }
+                    onClose: { withAnimation { screen = .home } }
                 )
             case .confirm(let category):
-                WatchConfirmView(category: category, count: todaysMomentCount)
+                WatchConfirmView(category: category)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: screen)
@@ -46,7 +46,7 @@ struct WatchRootView: View {
         dismissTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled else { return }
-            withAnimation { screen = .face }
+            withAnimation { screen = .home }
         }
     }
 }
