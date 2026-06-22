@@ -32,7 +32,7 @@ struct WatchRootView: View {
                     onClose: { withAnimation { screen = .home } }
                 )
             case .confirm(let category):
-                WatchConfirmView(category: category, count: todaysMomentCount)
+                WatchConfirmView(category: category)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: screen)
