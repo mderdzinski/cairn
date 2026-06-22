@@ -14,6 +14,11 @@ struct RootTabView: View {
                 .tabItem {
                     Label("Path", systemImage: "mountain.2")
                 }
+
+            PatternsView()
+                .tabItem {
+                    Label("Patterns", systemImage: "chart.bar")
+                }
         }
         .tint(.cairnAccent)
     }
