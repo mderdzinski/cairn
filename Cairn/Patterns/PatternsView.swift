@@ -38,28 +38,53 @@ struct PatternsView: View {
         }
     }
 
-    @ViewBuilder
     private var content: some View {
-        if inRange.isEmpty {
-            ContentUnavailableView(
-                "No moments yet",
-                systemImage: "chart.bar",
-                description: Text("Capture a moment to start seeing patterns.")
-            )
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: CairnSpacing.size5) {
-                    header
+        ScrollView {
+            VStack(alignment: .leading, spacing: CairnSpacing.size5) {
+                header
+                if inRange.isEmpty {
+                    emptyState
+                } else {
                     WeeklyTotalCard(moments: inRange)
                     RhythmCard(daily: daily, range: range)
                     BreakdownCard(breakdown: breakdown)
                 }
-                .padding(.horizontal, CairnSpacing.size5)
-                .padding(.top, CairnSpacing.size3)
-                .padding(.bottom, CairnSpacing.size12)
             }
-            .scrollContentBackground(.hidden)
+            .padding(.horizontal, CairnSpacing.size5)
+            .padding(.top, CairnSpacing.size3)
+            .padding(.bottom, CairnSpacing.size12)
         }
+        .scrollContentBackground(.hidden)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: CairnSpacing.size3) {
+            Image(systemName: "chart.bar")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(Color.cairnTextTertiary)
+            Text(emptyStateTitle)
+                .font(.cairnSerif(size: 18, weight: .regular))
+                .foregroundStyle(Color.cairnTextPrimary)
+            Text(emptyStateMessage)
+                .font(.cairnLabel)
+                .foregroundStyle(Color.cairnTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, CairnSpacing.size12)
+    }
+
+    private var emptyStateTitle: String {
+        allMoments.isEmpty ? "No moments yet" : "Nothing in this range"
+    }
+
+    private var emptyStateMessage: String {
+        if allMoments.isEmpty {
+            return "Capture a moment to start seeing patterns."
+        }
+        return range == .week
+            ? "Switch to This month to see older moments."
+            : "Capture a moment to see it here."
     }
 
     private var header: some View {
