@@ -17,6 +17,10 @@ struct ReflectSheet: View {
         _editingText = State(initialValue: moment.reflection ?? "")
     }
 
+    private var hasUnsavedChanges: Bool {
+        editingText != (moment.reflection ?? "")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -40,6 +44,7 @@ struct ReflectSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
         .presentationBackground(.thinMaterial)
+        .interactiveDismissDisabled(hasUnsavedChanges)
         .confirmationDialog(
             "Delete this moment?",
             isPresented: $showingDeleteConfirmation,
