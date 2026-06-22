@@ -13,5 +13,9 @@
 		<string>HankenGrotesk-Variable.ttf</string>
 		<string>SplineSansMono-Variable.ttf</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

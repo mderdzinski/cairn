@@ -4,20 +4,37 @@ import SwiftUI
 
 @main
 struct CairnApp: App {
+    private let sharedModelContainer: ModelContainer = {
+        let schema = Schema([Moment.self])
+        let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let configuration =
+            isUnderXCTest
+                ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                : ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .private("iCloud.com.markderdzinski.Cairn")
+                )
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Failed to create Cairn ModelContainer: \(error)")
+        }
+    }()
+
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .task {
-                    await migrateSluggishnessToHeaviness()
+                    migrateSluggishnessToHeaviness()
                 }
         }
-        .modelContainer(for: Moment.self)
+        .modelContainer(sharedModelContainer)
     }
 
     @MainActor
-    private func migrateSluggishnessToHeaviness() async {
-        guard let container = try? ModelContainer(for: Moment.self) else { return }
-        let context = ModelContext(container)
+    private func migrateSluggishnessToHeaviness() {
+        let context = ModelContext(sharedModelContainer)
         let descriptor = FetchDescriptor<Moment>(
             predicate: #Predicate { $0.categoryRaw == "sluggishness" }
         )
