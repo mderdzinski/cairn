@@ -25,15 +25,21 @@ struct CairnCaptureLauncherView: View {
             Label("Cairn", systemImage: "mountain.2")
         case .accessoryRectangular:
             HStack(spacing: 8) {
-                Image(systemName: "mountain.2")
-                    .font(.system(size: 18, weight: .semibold))
+                Image("CairnGlyph")
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 22, height: 22)
                 Text("Capture a moment")
                     .font(.body)
                 Spacer(minLength: 0)
             }
         default:
-            Image(systemName: "mountain.2")
-                .font(.system(size: 24, weight: .semibold))
+            Image("CairnGlyph")
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .padding(4)
         }
     }
 }
