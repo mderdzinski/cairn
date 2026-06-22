@@ -22,12 +22,14 @@ struct WatchHomeView: View {
                 }
 
                 VStack(spacing: 2) {
-                    Text("What are you noticing?")
+                    Text(stoneCountLine)
                         .font(.cairnSerif(size: 20, weight: .regular))
                         .foregroundStyle(Color.cairnTextPrimary)
-                    Text(stoneCountLine)
+                    Text("What are you noticing?")
                         .font(.cairnLabel)
                         .foregroundStyle(Color.cairnTextSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
 
                 Spacer(minLength: 0)
