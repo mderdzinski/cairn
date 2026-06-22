@@ -17,7 +17,7 @@ struct WatchHomeView: View {
 
                 Spacer(minLength: 0)
 
-                StoneStack(count: min(todayCount, 6), size: .large)
+                StoneStack(count: min(todayCount, 6), size: .medium)
 
                 VStack(spacing: 2) {
                     Text(stoneCountLine)
