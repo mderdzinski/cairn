@@ -152,4 +152,77 @@ struct MomentAggregatesTests {
         )
         #expect(filtered.count == 2)
     }
+
+    @Test("cutoffDate() for week is six days before the start of today")
+    func cutoffWeek() {
+        let cutoff = MomentAggregates.cutoffDate(for: .week, now: now, calendar: calendar)
+        let today = calendar.startOfDay(for: now)
+        let expected = calendar.date(byAdding: .day, value: -6, to: today)
+        #expect(cutoff == expected)
+    }
+
+    @Test("cutoffDate() for month is 29 days before the start of today")
+    func cutoffMonth() {
+        let cutoff = MomentAggregates.cutoffDate(for: .month, now: now, calendar: calendar)
+        let today = calendar.startOfDay(for: now)
+        let expected = calendar.date(byAdding: .day, value: -29, to: today)
+        #expect(cutoff == expected)
+    }
+
+    @Test("cutoffDate() matches the filter() boundary")
+    func cutoffMatchesFilter() {
+        // A moment captured at exactly the cutoff instant should be included.
+        let cutoff = MomentAggregates.cutoffDate(for: .week, now: now, calendar: calendar)
+        let onCutoff = Moment(timestamp: cutoff, category: .contentment)
+        let justBefore = Moment(timestamp: cutoff.addingTimeInterval(-1), category: .contentment)
+        let filtered = MomentAggregates.filter(
+            moments: [onCutoff, justBefore],
+            within: .week,
+            now: now,
+            calendar: calendar
+        )
+        #expect(filtered.contains { $0.id == onCutoff.id })
+        #expect(!filtered.contains { $0.id == justBefore.id })
+    }
+}
+
+@Suite("PatternsDigest")
+struct PatternsDigestTests {
+    private let calendar = Calendar(identifier: .gregorian)
+    private let now = Date(timeIntervalSince1970: 1_750_000_000)
+
+    private func moment(_ category: MomentCategory, daysAgo: Int) -> Moment {
+        let today = calendar.startOfDay(for: now)
+        let day = calendar.date(byAdding: .day, value: -daysAgo, to: today) ?? today
+        let stamp = calendar.date(byAdding: .hour, value: 12, to: day) ?? day
+        return Moment(timestamp: stamp, category: category)
+    }
+
+    @Test("digest bundles daily, breakdown, split, and total in one pass")
+    func digestBundles() {
+        let moments = [
+            moment(.contentment, daysAgo: 0),
+            moment(.contentment, daysAgo: 1),
+            moment(.aversion, daysAgo: 0),
+            moment(.aversion, daysAgo: 2),
+            moment(.desire, daysAgo: 3),
+        ]
+        let digest = PatternsDigest(moments: moments, range: .week, now: now, calendar: calendar)
+        #expect(digest.total == 5)
+        #expect(digest.split.contentment == 2)
+        #expect(digest.split.friction == 3)
+        #expect(digest.daily.count == 7)
+        #expect(digest.breakdown.map(\.category) == [.contentment, .aversion, .desire])
+    }
+
+    @Test("empty digest still yields full daily timeline")
+    func emptyDigest() {
+        let digest = PatternsDigest(moments: [], range: .week, now: now, calendar: calendar)
+        #expect(digest.total == 0)
+        #expect(digest.split.contentment == 0)
+        #expect(digest.split.friction == 0)
+        #expect(digest.daily.count == 7)
+        #expect(digest.daily.allSatisfy { $0.total == 0 })
+        #expect(digest.breakdown.isEmpty)
+    }
 }
