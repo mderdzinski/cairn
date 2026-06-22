@@ -6,11 +6,15 @@ import SwiftUI
 struct CairnApp: App {
     private let sharedModelContainer: ModelContainer = {
         let schema = Schema([Moment.self])
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .private("iCloud.com.markderdzinski.Cairn")
-        )
+        let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let configuration =
+            isUnderXCTest
+                ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                : ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .private("iCloud.com.markderdzinski.Cairn")
+                )
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
