@@ -26,7 +26,7 @@ struct WatchConfirmView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.cairnPaper)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(.easeOut(duration: 0.42)) {
                 appeared = true
             }
         }

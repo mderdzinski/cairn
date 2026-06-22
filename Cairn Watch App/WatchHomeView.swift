@@ -17,13 +17,15 @@ struct WatchHomeView: View {
 
                 Spacer(minLength: 0)
 
-                StoneStack(count: min(todayCount, 6), size: .medium)
+                if todayCount > 0 {
+                    StoneStack(count: min(todayCount, 6), size: .medium)
+                }
 
                 VStack(spacing: 2) {
-                    Text(stoneCountLine)
+                    Text("What are you noticing?")
                         .font(.cairnSerif(size: 20, weight: .regular))
                         .foregroundStyle(Color.cairnTextPrimary)
-                    Text("Tap to mark a moment")
+                    Text(stoneCountLine)
                         .font(.cairnLabel)
                         .foregroundStyle(Color.cairnTextSecondary)
                 }
@@ -46,7 +48,7 @@ struct WatchHomeView: View {
 
     private var stoneCountLine: String {
         if todayCount == 0 {
-            return "No stones yet"
+            return "Tap to mark one"
         }
         return "\(todayCount) \(todayCount == 1 ? "stone" : "stones") today"
     }

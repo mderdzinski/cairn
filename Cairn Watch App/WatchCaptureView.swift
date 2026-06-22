@@ -13,7 +13,7 @@ struct WatchCaptureView: View {
     var body: some View {
         VStack(spacing: CairnSpacing.size2) {
             HStack {
-                Text("What's here?")
+                Text("Right now…")
                     .font(.cairnSerif(size: 16, weight: .regular))
                     .foregroundStyle(Color.cairnTextPrimary)
                 Spacer()
