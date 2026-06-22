@@ -124,15 +124,14 @@ struct ReflectSheet: View {
     private var footer: some View {
         HStack(spacing: CairnSpacing.size3) {
             Button("Skip for now") { onDismiss() }
-                .buttonStyle(GhostButtonStyle())
+                .buttonStyle(CairnButtonStyle(.ghost))
             Button(action: save) {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")
                     Text("Save reflection")
                 }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(CairnButtonStyle(.primary, block: true))
         }
     }
 
