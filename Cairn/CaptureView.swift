@@ -16,7 +16,6 @@ struct CaptureView: View {
     private let columns = [
         GridItem(.flexible(), spacing: CairnSpacing.size3),
         GridItem(.flexible(), spacing: CairnSpacing.size3),
-        GridItem(.flexible(), spacing: CairnSpacing.size3),
     ]
 
     var body: some View {
@@ -49,7 +48,7 @@ struct CaptureView: View {
                 .tracking(CairnTracking.eyebrowCaps)
                 .foregroundStyle(Color.cairnTextTertiary)
                 .textCase(.uppercase)
-            Text("How is it,\nright now?")
+            Text("What are you\nnoticing?")
                 .font(.cairnDisplay)
                 .tracking(CairnTracking.displayTight)
                 .foregroundStyle(Color.cairnTextPrimary)
@@ -58,17 +57,19 @@ struct CaptureView: View {
     }
 
     private var grid: some View {
-        LazyVGrid(columns: columns, spacing: CairnSpacing.size6) {
+        LazyVGrid(columns: columns, spacing: CairnSpacing.size3) {
             ForEach(MomentCategory.allCases, id: \.self) { category in
-                MomentChip(category: category) {
+                MomentChip(category: category, size: .large) {
                     capture(category)
                 }
             }
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var footer: some View {
         HStack(spacing: CairnSpacing.size3) {
+            StoneStack(count: min(todaysMomentCount, 6), size: .small)
             VStack(alignment: .leading, spacing: 2) {
                 Text(stoneCountLine)
                     .font(.cairnLabel)
@@ -78,7 +79,7 @@ struct CaptureView: View {
                     .font(.cairnBody)
                     .foregroundStyle(Color.cairnTextSecondary)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(CairnSpacing.size4)
         .background(Color.cairnBgSunken)

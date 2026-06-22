@@ -1,9 +1,32 @@
 import CairnCore
 import SwiftUI
 
+enum ChipSize {
+    case small, medium, large
+
+    var disc: CGFloat {
+        switch self {
+        case .small: 52
+        case .medium: 72
+        case .large: 96
+        }
+    }
+
+    var glyph: CGFloat {
+        (disc * 0.6).rounded()
+    }
+}
+
 struct MomentChip: View {
     let category: MomentCategory
+    let size: ChipSize
     let action: () -> Void
+
+    init(category: MomentCategory, size: ChipSize = .medium, action: @escaping () -> Void) {
+        self.category = category
+        self.size = size
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -13,9 +36,9 @@ struct MomentChip: View {
                     Image(category.assetName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 44, height: 44)
+                        .frame(width: size.glyph, height: size.glyph)
                 }
-                .frame(width: 72, height: 72)
+                .frame(width: size.disc, height: size.disc)
                 Text(category.displayName)
                     .font(.cairnLabel)
                     .foregroundStyle(CairnCategoryPalette.ink(category))
