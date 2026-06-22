@@ -36,6 +36,15 @@ struct WatchRootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: screen)
+        .onOpenURL(perform: handleDeepLink)
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "cairn", url.host == "capture" else { return }
+        dismissTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            screen = .capture
+        }
     }
 
     private func handleCapture(_ category: MomentCategory) {
