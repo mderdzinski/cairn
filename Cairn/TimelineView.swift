@@ -46,12 +46,9 @@ struct TimelineView: View {
                 ForEach(groupedDays, id: \.self) { day in
                     Section {
                         ForEach(grouped[day] ?? []) { moment in
-                            Button {
+                            TimelineEntry(moment: moment) {
                                 reflectingMoment = moment
-                            } label: {
-                                row(for: moment)
                             }
-                            .buttonStyle(.plain)
                             .listRowBackground(Color.cairnSurfaceCard)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
@@ -87,19 +84,6 @@ struct TimelineView: View {
         if Calendar.current.isDateInToday(day) { return "Today" }
         if Calendar.current.isDateInYesterday(day) { return "Yesterday" }
         return day.formatted(date: .abbreviated, time: .omitted)
-    }
-
-    private func row(for moment: Moment) -> some View {
-        HStack(spacing: CairnSpacing.size3) {
-            CategoryDot(category: moment.category, size: 28)
-            Text(moment.category.displayName)
-                .font(.cairnBody)
-                .foregroundStyle(Color.cairnTextPrimary)
-            Spacer()
-            Text(moment.timestamp.formatted(date: .omitted, time: .shortened))
-                .font(.cairnMono)
-                .foregroundStyle(Color.cairnTextSecondary)
-        }
     }
 
     private func delete(_ moment: Moment) {
