@@ -14,12 +14,19 @@ private enum ActiveSheet: Identifiable {
     }
 }
 
+private enum PendingToggle {
+    case notice
+    case reflect
+}
+
 struct RemindersView: View {
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @Environment(RemindersService.self) private var remindersService
     @Query private var moments: [Moment]
     @State private var activeSheet: ActiveSheet?
+    @State private var pendingToggle: PendingToggle?
+    @State private var isPriming = false
 
     private var settings: Binding<RemindersSettings> {
         Binding(
@@ -60,10 +67,60 @@ struct RemindersView: View {
         .sheet(item: $activeSheet) { sheet in
             timePicker(for: sheet)
         }
+        .sheet(isPresented: $isPriming) {
+            PrimingSheet(
+                onAllow: { Task { await primingAllowed() } },
+                onDismiss: dismissPriming
+            )
+        }
         .onChange(of: settingsData) { _, newValue in
             let decoded = RemindersSettings.decode(newValue)
             Task { await remindersService.reschedule(settings: decoded) }
         }
+    }
+
+    private func toggleBinding(for target: PendingToggle) -> Binding<Bool> {
+        Binding(
+            get: {
+                let current = settings.wrappedValue
+                return target == .notice ? current.noticeEnabled : current.reflectEnabled
+            },
+            set: { newValue in
+                var current = settings.wrappedValue
+                if newValue, !current.hasPrimedPermission {
+                    pendingToggle = target
+                    isPriming = true
+                    return
+                }
+                switch target {
+                case .notice: current.noticeEnabled = newValue
+                case .reflect: current.reflectEnabled = newValue
+                }
+                settings.wrappedValue = current
+            }
+        )
+    }
+
+    private func primingAllowed() async {
+        let granted = await remindersService.requestAuthorization()
+        var current = settings.wrappedValue
+        current.hasPrimedPermission = true
+        if granted, let target = pendingToggle {
+            switch target {
+            case .notice: current.noticeEnabled = true
+            case .reflect: current.reflectEnabled = true
+            }
+        }
+        settings.wrappedValue = current
+        await MainActor.run {
+            pendingToggle = nil
+            isPriming = false
+        }
+    }
+
+    private func dismissPriming() {
+        pendingToggle = nil
+        isPriming = false
     }
 
     private var intro: some View {
@@ -80,7 +137,7 @@ struct RemindersView: View {
                 systemImage: "bell",
                 title: "Notice reminders",
                 subtitle: "A nudge at a random moment to pause and notice",
-                isOn: settings.noticeEnabled
+                isOn: toggleBinding(for: .notice)
             )
             if settings.wrappedValue.noticeEnabled {
                 Divider().background(Color.cairnBorderSubtle)
@@ -111,7 +168,7 @@ struct RemindersView: View {
                 systemImage: "pencil",
                 title: "Reflection reminders",
                 subtitle: "A daily check-in when moments are waiting",
-                isOn: settings.reflectEnabled
+                isOn: toggleBinding(for: .reflect)
             )
             if settings.wrappedValue.reflectEnabled {
                 Divider().background(Color.cairnBorderSubtle)
