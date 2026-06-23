@@ -2,25 +2,17 @@ import CairnCore
 import SwiftUI
 
 struct WeeklyTotalCard: View {
-    let moments: [Moment]
-
-    private var split: (contentment: Int, friction: Int) {
-        MomentAggregates.contentmentSplit(moments: moments)
-    }
-
-    private var total: Int {
-        moments.count
-    }
+    let digest: PatternsDigest
 
     private var contentmentRatio: CGFloat {
-        guard total > 0 else { return 0 }
-        return CGFloat(split.contentment) / CGFloat(total)
+        guard digest.total > 0 else { return 0 }
+        return CGFloat(digest.split.contentment) / CGFloat(digest.total)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: CairnSpacing.size3) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(total)")
+                Text("\(digest.total)")
                     .font(.cairnSerif(size: 36, weight: .light))
                     .foregroundStyle(Color.cairnTextPrimary)
                 Spacer()
@@ -33,7 +25,7 @@ struct WeeklyTotalCard: View {
 
             HStack {
                 Label {
-                    Text("\(split.contentment) contentment")
+                    Text("\(digest.split.contentment) contentment")
                         .font(.cairnLabel.weight(.medium))
                 } icon: {
                     Circle().fill(Color.cairnAccent).frame(width: 8, height: 8)
@@ -41,7 +33,7 @@ struct WeeklyTotalCard: View {
                 .foregroundStyle(Color.cairnAccentInk)
                 Spacer()
                 Label {
-                    Text("\(split.friction) friction")
+                    Text("\(digest.split.friction) friction")
                         .font(.cairnLabel.weight(.medium))
                 } icon: {
                     Circle().fill(Color.cairnStone400).frame(width: 8, height: 8)
@@ -66,13 +58,16 @@ struct WeeklyTotalCard: View {
 }
 
 #Preview {
-    WeeklyTotalCard(moments: [
-        Moment(timestamp: .now, category: .contentment),
-        Moment(timestamp: .now, category: .contentment),
-        Moment(timestamp: .now, category: .contentment),
-        Moment(timestamp: .now, category: .aversion),
-        Moment(timestamp: .now, category: .restlessness),
-    ])
+    WeeklyTotalCard(digest: PatternsDigest(
+        moments: [
+            Moment(timestamp: .now, category: .contentment),
+            Moment(timestamp: .now, category: .contentment),
+            Moment(timestamp: .now, category: .contentment),
+            Moment(timestamp: .now, category: .aversion),
+            Moment(timestamp: .now, category: .restlessness),
+        ],
+        range: .week
+    ))
     .padding()
     .background(Color.cairnPaper)
 }

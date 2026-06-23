@@ -85,13 +85,32 @@ public enum MomentAggregates {
         return (contentment, moments.count - contentment)
     }
 
-    private static func cutoffDate(
+    public static func cutoffDate(
         for range: PatternsRange,
-        now: Date,
-        calendar: Calendar
+        now: Date = .now,
+        calendar: Calendar = .current
     ) -> Date {
         let today = calendar.startOfDay(for: now)
         let offset = -(range.dayCount - 1)
         return calendar.date(byAdding: .day, value: offset, to: today) ?? today
+    }
+}
+
+public struct PatternsDigest: Sendable {
+    public let daily: [DailyTotals]
+    public let breakdown: [CategoryTotal]
+    public let split: (contentment: Int, friction: Int)
+    public let total: Int
+
+    public init(
+        moments: [Moment],
+        range: PatternsRange,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) {
+        daily = MomentAggregates.daily(moments: moments, range: range, now: now, calendar: calendar)
+        breakdown = MomentAggregates.breakdown(moments: moments)
+        split = MomentAggregates.contentmentSplit(moments: moments)
+        total = moments.count
     }
 }
