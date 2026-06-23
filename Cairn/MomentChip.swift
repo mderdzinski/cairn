@@ -11,10 +11,6 @@ enum ChipSize {
         case .large: 96
         }
     }
-
-    var glyph: CGFloat {
-        (disc * 0.6).rounded()
-    }
 }
 
 struct MomentChip: View {
@@ -31,14 +27,12 @@ struct MomentChip: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: CairnSpacing.size2) {
-                ZStack {
-                    Circle().fill(CairnCategoryPalette.soft(category))
-                    Image(category.assetName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: size.glyph, height: size.glyph)
-                }
-                .frame(width: size.disc, height: size.disc)
+                CategoryDot(
+                    category: category,
+                    size: size.disc,
+                    showsGlyph: true,
+                    filled: false
+                )
                 Text(category.displayName)
                     .font(.cairnLabel)
                     .foregroundStyle(CairnCategoryPalette.ink(category))
@@ -54,6 +48,7 @@ private struct MomentChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .offset(y: configuration.isPressed ? 1 : 0)
             .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
     }
 }

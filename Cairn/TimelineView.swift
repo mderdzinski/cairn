@@ -8,6 +8,10 @@ struct TimelineView: View {
     private var moments: [Moment]
     @State private var reflectingMoment: Moment?
 
+    private var unreflectedCount: Int {
+        moments.lazy.filter { ($0.reflection ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -42,34 +46,82 @@ struct TimelineView: View {
                 description: Text("Capture your first moment to see it here.")
             )
         } else {
-            List {
-                ForEach(groupedDays, id: \.self) { day in
-                    Section {
-                        ForEach(grouped[day] ?? []) { moment in
-                            TimelineEntry(moment: moment) {
-                                reflectingMoment = moment
-                            }
-                            .listRowBackground(Color.cairnSurfaceCard)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    delete(moment)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.horizontal, CairnSpacing.gutter)
+                    .padding(.top, CairnSpacing.size2)
+                if unreflectedCount > 0 {
+                    unreflectedBanner
+                        .padding(.horizontal, CairnSpacing.gutter)
+                        .padding(.top, CairnSpacing.size4)
+                }
+                list
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: CairnSpacing.size1) {
+                Text("Your path")
+                    .font(.cairnEyebrow)
+                    .tracking(CairnTracking.eyebrowCaps)
+                    .foregroundStyle(Color.cairnTextTertiary)
+                    .textCase(.uppercase)
+                Text("\(moments.count) \(moments.count == 1 ? "moment" : "moments")")
+                    .font(.cairnSerif(size: 28, weight: .light))
+                    .foregroundStyle(Color.cairnTextPrimary)
+            }
+            Spacer(minLength: 0)
+            StoneStack(count: min(max(moments.count, 1), 6), size: .small)
+                .alignmentGuide(.firstTextBaseline) { dim in dim[VerticalAlignment.center] }
+        }
+    }
+
+    private var unreflectedBanner: some View {
+        HStack(spacing: CairnSpacing.size2) {
+            Image(systemName: "pencil")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.cairnAccentInk)
+            Text("\(unreflectedCount) \(unreflectedCount == 1 ? "moment" : "moments") waiting for reflection")
+                .font(.cairnLabel.weight(.medium))
+                .foregroundStyle(Color.cairnAccentInk)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, CairnSpacing.size3)
+        .padding(.horizontal, CairnSpacing.size3)
+        .background(Color.cairnSage50)
+        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.medium))
+    }
+
+    private var list: some View {
+        List {
+            ForEach(groupedDays, id: \.self) { day in
+                Section {
+                    ForEach(grouped[day] ?? []) { moment in
+                        TimelineEntry(moment: moment) {
+                            reflectingMoment = moment
+                        }
+                        .listRowBackground(Color.cairnSurfaceCard)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                delete(moment)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
-                    } header: {
-                        Text(sectionTitle(for: day))
-                            .font(.cairnEyebrow)
-                            .tracking(CairnTracking.eyebrowCaps)
-                            .foregroundStyle(Color.cairnTextTertiary)
-                            .textCase(.uppercase)
                     }
+                } header: {
+                    Text(sectionTitle(for: day))
+                        .font(.cairnEyebrow)
+                        .tracking(CairnTracking.eyebrowCaps)
+                        .foregroundStyle(Color.cairnTextTertiary)
+                        .textCase(.uppercase)
                 }
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
     }
 
     private var grouped: [Date: [Moment]] {

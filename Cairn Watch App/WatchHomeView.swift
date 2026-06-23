@@ -19,6 +19,10 @@ struct WatchHomeView: View {
 
                 if todayCount > 0 {
                     StoneStack(count: min(todayCount, 6), size: .medium)
+                } else {
+                    Capsule()
+                        .fill(Color.cairnBorderStrong.opacity(0.7))
+                        .frame(width: 34, height: 5)
                 }
 
                 VStack(spacing: 2) {
@@ -26,7 +30,7 @@ struct WatchHomeView: View {
                         .font(.cairnSerif(size: 20, weight: .regular))
                         .foregroundStyle(Color.cairnTextPrimary)
                     Text("What are you noticing?")
-                        .font(.cairnLabel)
+                        .font(.cairnSerif(size: 13, weight: .regular).italic())
                         .foregroundStyle(Color.cairnTextSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)

@@ -4,10 +4,16 @@ import SwiftUI
 import UIKit
 
 struct CaptureView: View {
+    let onSeePath: () -> Void
+
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
+
+    init(onSeePath: @escaping () -> Void = {}) {
+        self.onSeePath = onSeePath
+    }
 
     private var todaysMomentCount: Int {
         allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
@@ -21,6 +27,7 @@ struct CaptureView: View {
     var body: some View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
+            sageBackdrop
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .padding(.top, CairnSpacing.size2)
@@ -68,22 +75,51 @@ struct CaptureView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: CairnSpacing.size3) {
-            StoneStack(count: min(todaysMomentCount, 6), size: .small)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(stoneCountLine)
-                    .font(.cairnLabel)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.cairnTextPrimary)
-                Text("Reflect on them this evening.")
-                    .font(.cairnBody)
-                    .foregroundStyle(Color.cairnTextSecondary)
+        Button(action: onSeePath) {
+            HStack(spacing: CairnSpacing.size3) {
+                StoneStack(count: min(max(todaysMomentCount, 1), 6), size: .small)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stoneCountLine)
+                        .font(.cairnLabel)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.cairnTextPrimary)
+                    Text("Reflect on them this evening")
+                        .font(.cairnBody)
+                        .foregroundStyle(Color.cairnTextSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.cairnTextTertiary)
             }
-            Spacer(minLength: 0)
+            .padding(.vertical, CairnSpacing.size3)
+            .padding(.horizontal, CairnSpacing.size4)
+            .background(Color.cairnSurfaceCard.opacity(0.88))
+            .overlay(
+                RoundedRectangle(cornerRadius: CairnRadii.card)
+                    .strokeBorder(Color.cairnBorderSubtle, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: CairnRadii.card))
+            .shadow(color: Color.cairnStone900.opacity(0.05), radius: 3, x: 0, y: 1)
         }
-        .padding(CairnSpacing.size4)
-        .background(Color.cairnBgSunken)
-        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.card))
+        .buttonStyle(.plain)
+        .accessibilityHint(Text("Opens your path"))
+    }
+
+    private var sageBackdrop: some View {
+        GeometryReader { geo in
+            RadialGradient(
+                colors: [
+                    Color.cairnSage100.opacity(0.55),
+                    Color.clear,
+                ],
+                center: UnitPoint(x: 0.5, y: -0.06),
+                startRadius: 0,
+                endRadius: geo.size.width * 0.62
+            )
+            .ignoresSafeArea()
+        }
+        .allowsHitTesting(false)
     }
 
     private var eyebrowDate: String {
