@@ -9,7 +9,9 @@ enum CairnTab: Hashable {
 }
 
 struct RootTabView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var selection: CairnTab = .capture
+    @State private var remindersService = RemindersService()
 
     var body: some View {
         TabView(selection: $selection) {
@@ -32,6 +34,26 @@ struct RootTabView: View {
                 .tag(CairnTab.patterns)
         }
         .tint(.cairnAccent)
+        .environment(remindersService)
+        .onAppear {
+            remindersService.attach(modelContainer: modelContext.container)
+        }
+        .onChange(of: remindersService.lastDeepLinkURL) { _, url in
+            guard let url else { return }
+            route(url: url)
+            remindersService.lastDeepLinkURL = nil
+        }
+        .onOpenURL(perform: route(url:))
+    }
+
+    private func route(url: URL) {
+        guard url.scheme == "cairn" else { return }
+        switch url.host {
+        case "capture": selection = .capture
+        case "path": selection = .path
+        case "patterns": selection = .patterns
+        default: break
+        }
     }
 }
 

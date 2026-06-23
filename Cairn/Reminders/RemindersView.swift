@@ -17,6 +17,7 @@ private enum ActiveSheet: Identifiable {
 struct RemindersView: View {
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
+    @Environment(RemindersService.self) private var remindersService
     @Query private var moments: [Moment]
     @State private var activeSheet: ActiveSheet?
 
@@ -58,6 +59,10 @@ struct RemindersView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             timePicker(for: sheet)
+        }
+        .onChange(of: settingsData) { _, newValue in
+            let decoded = RemindersSettings.decode(newValue)
+            Task { await remindersService.reschedule(settings: decoded) }
         }
     }
 
@@ -217,5 +222,6 @@ struct RemindersView: View {
     NavigationStack {
         RemindersView()
             .modelContainer(for: Moment.self, inMemory: true)
+            .environment(RemindersService())
     }
 }
