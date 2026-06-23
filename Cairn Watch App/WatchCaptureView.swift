@@ -14,7 +14,7 @@ struct WatchCaptureView: View {
         VStack(spacing: CairnSpacing.size2) {
             HStack {
                 Text("Right now…")
-                    .font(.cairnSerif(size: 16, weight: .regular))
+                    .font(.cairnSerif(size: 16, weight: .regular).italic())
                     .foregroundStyle(Color.cairnTextPrimary)
                 Spacer()
                 Button(action: onClose) {
