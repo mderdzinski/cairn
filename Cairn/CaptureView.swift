@@ -10,6 +10,7 @@ struct CaptureView: View {
     @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
+    @State private var isShowingReminders = false
 
     init(onSeePath: @escaping () -> Void = {}) {
         self.onSeePath = onSeePath
@@ -25,36 +26,55 @@ struct CaptureView: View {
     ]
 
     var body: some View {
-        ZStack {
-            Color.cairnPaper.ignoresSafeArea()
-            sageBackdrop
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.top, CairnSpacing.size2)
-                Spacer(minLength: CairnSpacing.size8)
-                grid
-                Spacer(minLength: CairnSpacing.size6)
-                footer
-            }
-            .padding(.horizontal, CairnSpacing.gutter)
-            .padding(.bottom, CairnSpacing.size6)
+        NavigationStack {
+            ZStack {
+                Color.cairnPaper.ignoresSafeArea()
+                sageBackdrop
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                        .padding(.top, CairnSpacing.size2)
+                    Spacer(minLength: CairnSpacing.size8)
+                    grid
+                    Spacer(minLength: CairnSpacing.size6)
+                    footer
+                }
+                .padding(.horizontal, CairnSpacing.gutter)
+                .padding(.bottom, CairnSpacing.size6)
 
-            if let category = lastCaptured {
-                MarkedToast(category: category)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 88)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                if let category = lastCaptured {
+                    MarkedToast(category: category)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 88)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            .navigationDestination(isPresented: $isShowingReminders) {
+                RemindersView()
             }
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: CairnSpacing.size2) {
-            Text(eyebrowDate)
-                .font(.cairnEyebrow)
-                .tracking(CairnTracking.eyebrowCaps)
-                .foregroundStyle(Color.cairnTextTertiary)
-                .textCase(.uppercase)
+            HStack(alignment: .center) {
+                Text(eyebrowDate)
+                    .font(.cairnEyebrow)
+                    .tracking(CairnTracking.eyebrowCaps)
+                    .foregroundStyle(Color.cairnTextTertiary)
+                    .textCase(.uppercase)
+                Spacer(minLength: 0)
+                Button {
+                    isShowingReminders = true
+                } label: {
+                    Image(systemName: "bell")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(Color.cairnTextSecondary)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Reminders"))
+            }
             Text("What are you\nnoticing?")
                 .font(.cairnDisplay)
                 .tracking(CairnTracking.displayTight)
