@@ -78,31 +78,66 @@ struct TimePickerSheet: View {
 
     private func commit() {
         let newStart = Self.minutes(from: startDate)
-        if endMinutes != nil {
-            let newEnd = Self.minutes(from: endDate)
-            // Guard against end <= start (which would silently kill notice
-            // scheduling in RemindersScheduler). Enforce at least
-            // minimumNoticeSpacing's worth of room — one hour.
-            let minimumSpan = 60
-            if newEnd > newStart + minimumSpan {
-                startMinutes = newStart
-                endMinutes = newEnd
-            } else {
-                // Anchor on the changed value, push the other to keep a valid
-                // window. Compare against the previous committed values to
-                // detect which one moved.
-                let prevStart = startMinutes
-                if newStart != prevStart {
-                    startMinutes = newStart
-                    endMinutes = min(24 * 60 - 1, newStart + minimumSpan)
-                } else {
-                    startMinutes = max(0, newEnd - minimumSpan)
-                    endMinutes = newEnd
-                }
-            }
-        } else {
+        guard endMinutes != nil else {
             startMinutes = newStart
+            return
         }
+        let newEnd = Self.minutes(from: endDate)
+        let (clampedStart, clampedEnd) = Self.enforceMinimumSpan(
+            start: newStart,
+            end: newEnd,
+            previousStart: startMinutes,
+            previousEnd: endMinutes ?? newEnd
+        )
+        startMinutes = clampedStart
+        endMinutes = clampedEnd
+    }
+
+    /// Returns a (start, end) pair guaranteed to span at least
+    /// `minimumSpan` minutes, even at day boundaries (00:00 / 23:59).
+    /// When the requested values can't both be honored, the *unedited*
+    /// side moves first; if that would push it off the day boundary,
+    /// the edited side is pulled back to make room. This means an
+    /// invalid commit never silently kills the active-hours window.
+    static func enforceMinimumSpan(
+        start: Int,
+        end: Int,
+        previousStart: Int,
+        previousEnd: Int,
+        minimumSpan: Int = 60,
+        dayMax: Int = 24 * 60 - 1
+    ) -> (start: Int, end: Int) {
+        if end - start >= minimumSpan {
+            return (start, end)
+        }
+        let startMoved = start != previousStart
+        let endMoved = end != previousEnd
+
+        if startMoved, !endMoved {
+            // Start was edited: try pushing end forward; if that would
+            // overflow the day, pull start back instead.
+            let desiredEnd = start + minimumSpan
+            if desiredEnd <= dayMax {
+                return (start, desiredEnd)
+            }
+            return (dayMax - minimumSpan, dayMax)
+        }
+        if endMoved, !startMoved {
+            // End was edited: try pulling start back; if that would go
+            // below 0, push end forward instead.
+            let desiredStart = end - minimumSpan
+            if desiredStart >= 0 {
+                return (desiredStart, end)
+            }
+            return (0, minimumSpan)
+        }
+        // Both moved (or neither moved into a valid arrangement): anchor
+        // on start, push end forward, then pull start back if needed.
+        let desiredEnd = start + minimumSpan
+        if desiredEnd <= dayMax {
+            return (start, desiredEnd)
+        }
+        return (dayMax - minimumSpan, dayMax)
     }
 
     private static func date(from minutes: Int) -> Date {

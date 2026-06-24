@@ -6,6 +6,7 @@ import UserNotifications
 @Observable
 final class RemindersService: NSObject {
     private let center = UNUserNotificationCenter.current()
+    private var rescheduleGeneration: UInt64 = 0
     var lastDeepLinkURL: URL?
 
     func requestAuthorization() async -> Bool {
@@ -21,7 +22,13 @@ final class RemindersService: NSObject {
     }
 
     func reschedule(settings: RemindersSettings, now: Date = .now) async {
+        rescheduleGeneration &+= 1
+        let generation = rescheduleGeneration
+
         await cancelAll()
+        // A newer call landed while we awaited cancel — bail before
+        // re-adding stale requests on top of the newer batch's work.
+        guard generation == rescheduleGeneration else { return }
         guard settings.anyEnabled else { return }
 
         var random = SystemRandomNumberGenerator()
@@ -32,6 +39,7 @@ final class RemindersService: NSObject {
         )
 
         for reminder in scheduled {
+            guard generation == rescheduleGeneration else { return }
             let request = makeRequest(reminder: reminder)
             try? await center.add(request)
         }
