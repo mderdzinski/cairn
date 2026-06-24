@@ -34,7 +34,7 @@ struct TimePickerSheet: View {
                     Divider().padding(.horizontal, CairnSpacing.size4)
                     pickerRow(label: "End", selection: $endDate)
                 } else {
-                    pickerRow(label: nil, selection: $startDate)
+                    pickerRow(label: "Time", selection: $startDate)
                 }
                 Spacer()
             }
@@ -62,13 +62,11 @@ struct TimePickerSheet: View {
         .preferredColorScheme(.light)
     }
 
-    private func pickerRow(label: String?, selection: Binding<Date>) -> some View {
+    private func pickerRow(label: String, selection: Binding<Date>) -> some View {
         HStack {
-            if let label {
-                Text(label)
-                    .font(.cairnLabel.weight(.medium))
-                    .foregroundStyle(Color.cairnTextPrimary)
-            }
+            Text(label)
+                .font(.cairnLabel.weight(.medium))
+                .foregroundStyle(Color.cairnTextPrimary)
             Spacer()
             DatePicker("", selection: selection, displayedComponents: .hourAndMinute)
                 .labelsHidden()
