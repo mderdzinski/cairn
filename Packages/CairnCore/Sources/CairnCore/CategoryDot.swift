@@ -6,7 +6,7 @@ public struct CategoryDot: View {
     public var showsGlyph: Bool
     public var filled: Bool
 
-    public init(category: MomentCategory, size: CGFloat = 32, showsGlyph: Bool = false, filled: Bool = false) {
+    public init(category: MomentCategory, size: CGFloat = 32, showsGlyph: Bool = true, filled: Bool = false) {
         self.category = category
         self.size = size
         self.showsGlyph = showsGlyph
@@ -14,7 +14,7 @@ public struct CategoryDot: View {
     }
 
     private var shouldShowGlyph: Bool {
-        filled || showsGlyph
+        showsGlyph
     }
 
     private var glyphSize: CGFloat {

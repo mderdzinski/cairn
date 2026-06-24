@@ -36,7 +36,7 @@ private struct BreakdownRow: View {
 
     var body: some View {
         HStack(spacing: CairnSpacing.size3) {
-            CategoryDot(category: total.category, size: 18, filled: true)
+            CategoryDot(category: total.category, size: 28)
 
             Text(total.category.displayName)
                 .font(.cairnLabel.weight(.semibold))

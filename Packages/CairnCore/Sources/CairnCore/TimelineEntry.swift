@@ -12,7 +12,7 @@ public struct TimelineEntry: View {
     public var body: some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: CairnSpacing.size3) {
-                CategoryDot(category: moment.category, size: 28)
+                CategoryDot(category: moment.category, size: 36)
 
                 VStack(alignment: .leading, spacing: CairnSpacing.size1) {
                     HStack(alignment: .firstTextBaseline) {
