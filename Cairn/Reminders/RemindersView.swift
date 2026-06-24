@@ -20,6 +20,8 @@ private enum PendingToggle {
 }
 
 struct RemindersView: View {
+    let onPreviewTap: (CairnTab) -> Void
+
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @Environment(RemindersService.self) private var remindersService
@@ -29,6 +31,10 @@ struct RemindersView: View {
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
     @State private var showsDeniedAlert = false
+
+    init(onPreviewTap: @escaping (CairnTab) -> Void = { _ in }) {
+        self.onPreviewTap = onPreviewTap
+    }
 
     private var settings: Binding<RemindersSettings> {
         Binding(
@@ -211,7 +217,7 @@ struct RemindersView: View {
             ReminderCardHead(
                 systemImage: "pencil",
                 title: "Reflection reminders",
-                subtitle: "A daily check-in when moments are waiting",
+                subtitle: "A daily nudge to come back and reflect",
                 isOn: toggleBinding(for: .reflect)
             )
             if settings.wrappedValue.reflectEnabled {
@@ -273,14 +279,13 @@ struct RemindersView: View {
 
     private var reflectHelperText: String {
         if pendingCount > 0 {
-            return "\(pendingCount) waiting right now. Sent at your chosen time; the body adapts to what's pending then."
+            return "A daily nudge at your chosen time — \(pendingCount) waiting to revisit right now."
         }
-        return "Sent at your chosen time; gentler copy when nothing is waiting."
+        return "A daily nudge at your chosen time — a quiet moment to come back to your path."
     }
 
     private var reflectPreviewBody: String {
-        let count = max(pendingCount, 3)
-        return "\(count) moments are waiting to be revisited."
+        "A quiet moment to revisit your path."
     }
 
     @ViewBuilder
@@ -306,15 +311,11 @@ struct RemindersView: View {
     }
 
     private func openCapture() {
-        if let url = URL(string: "cairn://capture") {
-            UIApplication.shared.open(url)
-        }
+        onPreviewTap(.capture)
     }
 
     private func openPath() {
-        if let url = URL(string: "cairn://path") {
-            UIApplication.shared.open(url)
-        }
+        onPreviewTap(.path)
     }
 }
 

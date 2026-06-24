@@ -9,7 +9,6 @@ enum CairnTab: Hashable {
 }
 
 struct RootTabView: View {
-    @Environment(\.modelContext) private var modelContext
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @State private var selection: CairnTab = .capture
@@ -18,11 +17,15 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            CaptureView(onSeePath: { route(to: .path) }, path: $capturePath)
-                .tabItem {
-                    Label("Capture", systemImage: "plus")
-                }
-                .tag(CairnTab.capture)
+            CaptureView(
+                onSeePath: { route(to: .path) },
+                onRoute: route(to:),
+                path: $capturePath
+            )
+            .tabItem {
+                Label("Capture", systemImage: "plus")
+            }
+            .tag(CairnTab.capture)
 
             TimelineView()
                 .tabItem {
@@ -39,7 +42,6 @@ struct RootTabView: View {
         .tint(.cairnAccent)
         .environment(remindersService)
         .task {
-            remindersService.attach(modelContainer: modelContext.container)
             // Capture a launch-time deep link (delivered before view body ran)
             if let url = remindersService.lastDeepLinkURL {
                 route(url: url)

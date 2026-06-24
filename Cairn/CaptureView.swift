@@ -9,6 +9,7 @@ enum CaptureDestination: Hashable {
 
 struct CaptureView: View {
     let onSeePath: () -> Void
+    let onRoute: (CairnTab) -> Void
 
     @Binding var path: NavigationPath
 
@@ -17,8 +18,13 @@ struct CaptureView: View {
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
 
-    init(onSeePath: @escaping () -> Void = {}, path: Binding<NavigationPath> = .constant(NavigationPath())) {
+    init(
+        onSeePath: @escaping () -> Void = {},
+        onRoute: @escaping (CairnTab) -> Void = { _ in },
+        path: Binding<NavigationPath> = .constant(NavigationPath())
+    ) {
         self.onSeePath = onSeePath
+        self.onRoute = onRoute
         _path = path
     }
 
@@ -56,7 +62,7 @@ struct CaptureView: View {
             }
             .navigationDestination(for: CaptureDestination.self) { destination in
                 switch destination {
-                case .reminders: RemindersView()
+                case .reminders: RemindersView(onPreviewTap: onRoute)
                 }
             }
         }

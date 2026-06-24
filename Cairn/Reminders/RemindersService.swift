@@ -1,18 +1,12 @@
 import CairnCore
 import Foundation
-import SwiftData
 import UserNotifications
 
 @MainActor
 @Observable
 final class RemindersService: NSObject {
     private let center = UNUserNotificationCenter.current()
-    private weak var modelContainer: ModelContainer?
     var lastDeepLinkURL: URL?
-
-    func attach(modelContainer: ModelContainer) {
-        self.modelContainer = modelContainer
-    }
 
     func requestAuthorization() async -> Bool {
         do {
@@ -87,37 +81,20 @@ final class RemindersService: NSObject {
             return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         }
     }
-
-    private func pendingReflectionCount() -> Int {
-        guard let container = modelContainer else { return 0 }
-        let context = ModelContext(container)
-        let descriptor = FetchDescriptor<Moment>()
-        guard let moments = try? context.fetch(descriptor) else { return 0 }
-        return moments.filter {
-            ($0.reflection ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }.count
-    }
 }
 
 extension RemindersService: UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
+        willPresent _: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        let identifier = notification.request.identifier
-        if identifier == RemindersScheduler.reflectIdentifier {
-            Task { @MainActor in
-                let count = pendingReflectionCount()
-                if count == 0 {
-                    completionHandler([])
-                } else {
-                    completionHandler([.banner, .sound])
-                }
-            }
-        } else {
-            completionHandler([.banner, .sound])
-        }
+        // Reflect reminders fire daily regardless of pending count — see
+        // RemindersView's helper copy. A future PR with a
+        // UNNotificationServiceExtension could gate background delivery
+        // on the live pending count; until then the trigger is daily and
+        // foreground delivery behaves the same.
+        completionHandler([.banner, .sound])
     }
 
     nonisolated func userNotificationCenter(
