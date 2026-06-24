@@ -2,21 +2,15 @@ import CairnCore
 import SwiftData
 import SwiftUI
 
-private enum ActiveSheet: Identifiable {
-    case activeHours
-    case reflectTime
-
-    var id: Int {
-        switch self {
-        case .activeHours: 0
-        case .reflectTime: 1
-        }
-    }
-}
-
 private enum PendingToggle {
     case notice
     case reflect
+}
+
+private enum ExpandedRow: Hashable {
+    case activeStart
+    case activeEnd
+    case reflectTime
 }
 
 struct RemindersView: View {
@@ -27,7 +21,7 @@ struct RemindersView: View {
     @Environment(RemindersService.self) private var remindersService
     @Environment(\.openURL) private var openURL
     @Query private var moments: [Moment]
-    @State private var activeSheet: ActiveSheet?
+    @State private var expandedRow: ExpandedRow?
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
     @State private var showsDeniedAlert = false
@@ -71,9 +65,6 @@ struct RemindersView: View {
                     .font(.cairnTitle)
                     .foregroundStyle(Color.cairnTextPrimary)
             }
-        }
-        .sheet(item: $activeSheet) { sheet in
-            timePicker(for: sheet)
         }
         .sheet(isPresented: $isPriming) {
             PrimingSheet(
@@ -191,12 +182,16 @@ struct RemindersView: View {
             )
             if settings.wrappedValue.noticeEnabled {
                 Divider().background(Color.cairnBorderSubtle)
-                ValueRow(
-                    label: "Active hours",
-                    value: activeHoursValue
-                ) {
-                    activeSheet = .activeHours
-                }
+                InlineTimeRow(
+                    label: "Start",
+                    minutes: activeStartBinding,
+                    isExpanded: expandedBinding(for: .activeStart)
+                )
+                InlineTimeRow(
+                    label: "End",
+                    minutes: activeEndBinding,
+                    isExpanded: expandedBinding(for: .activeEnd)
+                )
                 Text("Reminders only arrive inside this window — never while you're asleep.")
                     .font(.cairnLabel)
                     .foregroundStyle(Color.cairnTextTertiary)
@@ -222,12 +217,11 @@ struct RemindersView: View {
             )
             if settings.wrappedValue.reflectEnabled {
                 Divider().background(Color.cairnBorderSubtle)
-                ValueRow(
+                InlineTimeRow(
                     label: "Remind me at",
-                    value: RemindersSettings.format(minutes: settings.wrappedValue.reflectTime)
-                ) {
-                    activeSheet = .reflectTime
-                }
+                    minutes: settings.reflectTime,
+                    isExpanded: expandedBinding(for: .reflectTime)
+                )
                 Text(reflectHelperText)
                     .font(.cairnLabel)
                     .foregroundStyle(Color.cairnTextTertiary)
@@ -264,12 +258,6 @@ struct RemindersView: View {
         }
     }
 
-    private var activeHoursValue: String {
-        let start = RemindersSettings.format(minutes: settings.wrappedValue.activeHoursStart)
-        let end = RemindersSettings.format(minutes: settings.wrappedValue.activeHoursEnd)
-        return "\(start) – \(end)"
-    }
-
     private var frequencyHelperText: String {
         switch settings.wrappedValue.freq {
         case .once: "One reminder at a random time each day."
@@ -288,26 +276,51 @@ struct RemindersView: View {
         "A quiet moment to revisit your path."
     }
 
-    @ViewBuilder
-    private func timePicker(for sheet: ActiveSheet) -> some View {
-        switch sheet {
-        case .activeHours:
-            TimePickerSheet(
-                title: "Active hours",
-                startMinutes: settings.activeHoursStart,
-                endMinutes: Binding(
-                    get: { settings.wrappedValue.activeHoursEnd },
-                    set: { settings.wrappedValue.activeHoursEnd = $0 ?? settings.wrappedValue.activeHoursEnd }
-                ),
-                onDone: { activeSheet = nil }
-            )
-        case .reflectTime:
-            TimePickerSheet(
-                title: "Remind me at",
-                startMinutes: settings.reflectTime,
-                onDone: { activeSheet = nil }
-            )
-        }
+    private var activeStartBinding: Binding<Int> {
+        Binding(
+            get: { settings.wrappedValue.activeHoursStart },
+            set: { newStart in
+                var current = settings.wrappedValue
+                let (clampedStart, clampedEnd) = TimeRangeClamp.enforce(
+                    start: newStart,
+                    end: current.activeHoursEnd,
+                    previousStart: current.activeHoursStart,
+                    previousEnd: current.activeHoursEnd
+                )
+                current.activeHoursStart = clampedStart
+                current.activeHoursEnd = clampedEnd
+                settings.wrappedValue = current
+            }
+        )
+    }
+
+    private var activeEndBinding: Binding<Int> {
+        Binding(
+            get: { settings.wrappedValue.activeHoursEnd },
+            set: { newEnd in
+                var current = settings.wrappedValue
+                let (clampedStart, clampedEnd) = TimeRangeClamp.enforce(
+                    start: current.activeHoursStart,
+                    end: newEnd,
+                    previousStart: current.activeHoursStart,
+                    previousEnd: current.activeHoursEnd
+                )
+                current.activeHoursStart = clampedStart
+                current.activeHoursEnd = clampedEnd
+                settings.wrappedValue = current
+            }
+        )
+    }
+
+    private func expandedBinding(for row: ExpandedRow) -> Binding<Bool> {
+        Binding(
+            get: { expandedRow == row },
+            set: { isOpen in
+                withAnimation(.easeOut(duration: 0.18)) {
+                    expandedRow = isOpen ? row : nil
+                }
+            }
+        )
     }
 
     private func openCapture() {
