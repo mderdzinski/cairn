@@ -52,32 +52,55 @@ struct RemindersSchedulerTests {
         #expect(result.isEmpty)
     }
 
-    @Test("Notice once-a-day fires exactly once when enabled")
-    func noticeOnce() {
+    @Test("Notice once-a-day fires exactly once per look-ahead day")
+    func noticeOncePerDay() {
         let settings = RemindersSettings(noticeEnabled: true, freq: .once)
         var random = FixedRandomSource([100, 200, 300, 400, 500])
         let result = RemindersScheduler.compute(
             settings: settings,
             now: at(6),
             calendar: calendar,
+            noticeLookAheadDays: 1,
             randomSource: &random
         )
         let notices = result.filter { $0.kind == .notice }
         #expect(notices.count == 1)
     }
 
-    @Test("Notice few-a-day caps at 3 fires")
-    func noticeFewCap() {
+    @Test("Notice few-a-day caps at 3 per day across the look-ahead")
+    func noticeFewPerDayCap() {
         let settings = RemindersSettings(noticeEnabled: true, freq: .few)
         var random = FixedRandomSource([60, 200, 400, 600, 700, 800, 100, 300, 500, 720])
         let result = RemindersScheduler.compute(
             settings: settings,
             now: at(6),
             calendar: calendar,
+            noticeLookAheadDays: 3,
             randomSource: &random
         )
         let notices = result.filter { $0.kind == .notice }
-        #expect(notices.count <= 3)
+        // Three days × three-per-day cap
+        #expect(notices.count <= 9)
+        let perDay = Dictionary(grouping: notices) { calendar.startOfDay(for: $0.fireDate) }
+        for (_, dayFires) in perDay {
+            #expect(dayFires.count <= 3)
+        }
+    }
+
+    @Test("Notice look-ahead covers the full window in days")
+    func noticeLookAheadDays() {
+        let settings = RemindersSettings(noticeEnabled: true, freq: .once)
+        var random = FixedRandomSource(Array(60 ... 200).map { UInt64($0) })
+        let result = RemindersScheduler.compute(
+            settings: settings,
+            now: at(6),
+            calendar: calendar,
+            noticeLookAheadDays: 5,
+            randomSource: &random
+        )
+        let notices = result.filter { $0.kind == .notice }
+        let distinctDays = Set(notices.map { calendar.startOfDay(for: $0.fireDate) })
+        #expect(distinctDays.count == 5)
     }
 
     @Test("Notice fires are spaced at least 60 minutes apart")

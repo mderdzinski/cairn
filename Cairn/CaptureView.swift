@@ -3,17 +3,23 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+enum CaptureDestination: Hashable {
+    case reminders
+}
+
 struct CaptureView: View {
     let onSeePath: () -> Void
+
+    @Binding var path: NavigationPath
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
-    @State private var isShowingReminders = false
 
-    init(onSeePath: @escaping () -> Void = {}) {
+    init(onSeePath: @escaping () -> Void = {}, path: Binding<NavigationPath> = .constant(NavigationPath())) {
         self.onSeePath = onSeePath
+        _path = path
     }
 
     private var todaysMomentCount: Int {
@@ -26,7 +32,7 @@ struct CaptureView: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Color.cairnPaper.ignoresSafeArea()
                 sageBackdrop
@@ -48,8 +54,10 @@ struct CaptureView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .navigationDestination(isPresented: $isShowingReminders) {
-                RemindersView()
+            .navigationDestination(for: CaptureDestination.self) { destination in
+                switch destination {
+                case .reminders: RemindersView()
+                }
             }
         }
     }
@@ -64,7 +72,7 @@ struct CaptureView: View {
                     .textCase(.uppercase)
                 Spacer(minLength: 0)
                 Button {
-                    isShowingReminders = true
+                    path.append(CaptureDestination.reminders)
                 } label: {
                     Image(systemName: "bell")
                         .font(.system(size: 17, weight: .regular))

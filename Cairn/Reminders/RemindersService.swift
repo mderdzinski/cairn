@@ -12,7 +12,6 @@ final class RemindersService: NSObject {
 
     func attach(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
-        center.delegate = self
     }
 
     func requestAuthorization() async -> Bool {

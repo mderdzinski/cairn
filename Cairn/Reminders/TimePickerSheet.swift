@@ -77,9 +77,31 @@ struct TimePickerSheet: View {
     }
 
     private func commit() {
-        startMinutes = Self.minutes(from: startDate)
+        let newStart = Self.minutes(from: startDate)
         if endMinutes != nil {
-            endMinutes = Self.minutes(from: endDate)
+            let newEnd = Self.minutes(from: endDate)
+            // Guard against end <= start (which would silently kill notice
+            // scheduling in RemindersScheduler). Enforce at least
+            // minimumNoticeSpacing's worth of room — one hour.
+            let minimumSpan = 60
+            if newEnd > newStart + minimumSpan {
+                startMinutes = newStart
+                endMinutes = newEnd
+            } else {
+                // Anchor on the changed value, push the other to keep a valid
+                // window. Compare against the previous committed values to
+                // detect which one moved.
+                let prevStart = startMinutes
+                if newStart != prevStart {
+                    startMinutes = newStart
+                    endMinutes = min(24 * 60 - 1, newStart + minimumSpan)
+                } else {
+                    startMinutes = max(0, newEnd - minimumSpan)
+                    endMinutes = newEnd
+                }
+            }
+        } else {
+            startMinutes = newStart
         }
     }
 

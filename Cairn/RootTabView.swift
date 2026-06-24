@@ -13,11 +13,12 @@ struct RootTabView: View {
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @State private var selection: CairnTab = .capture
-    @State private var remindersService = RemindersService()
+    @State private var capturePath = NavigationPath()
+    let remindersService: RemindersService
 
     var body: some View {
         TabView(selection: $selection) {
-            CaptureView(onSeePath: { selection = .path })
+            CaptureView(onSeePath: { route(to: .path) }, path: $capturePath)
                 .tabItem {
                     Label("Capture", systemImage: "plus")
                 }
@@ -39,6 +40,11 @@ struct RootTabView: View {
         .environment(remindersService)
         .task {
             remindersService.attach(modelContainer: modelContext.container)
+            // Capture a launch-time deep link (delivered before view body ran)
+            if let url = remindersService.lastDeepLinkURL {
+                route(url: url)
+                remindersService.lastDeepLinkURL = nil
+            }
             let settings = RemindersSettings.decode(settingsData)
             if settings.anyEnabled {
                 await remindersService.reschedule(settings: settings)
@@ -53,17 +59,23 @@ struct RootTabView: View {
     }
 
     private func route(url: URL) {
-        guard url.scheme == "cairn" else { return }
-        switch url.host {
-        case "capture": selection = .capture
-        case "path": selection = .path
-        case "patterns": selection = .patterns
+        guard url.scheme == "cairn", let host = url.host else { return }
+        switch host {
+        case "capture": route(to: .capture)
+        case "path": route(to: .path)
+        case "patterns": route(to: .patterns)
         default: break
         }
+    }
+
+    private func route(to tab: CairnTab) {
+        selection = tab
+        // External routes should land on the tab root, not deep inside it.
+        capturePath = NavigationPath()
     }
 }
 
 #Preview {
-    RootTabView()
+    RootTabView(remindersService: RemindersService())
         .modelContainer(for: Moment.self, inMemory: true)
 }
