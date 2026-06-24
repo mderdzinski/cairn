@@ -66,20 +66,27 @@ final class RemindersService: NSObject {
             content.body = "What are you noticing right now?"
             content.userInfo = ["cairn.deeplink": "cairn://capture"]
         case .reflect:
-            content.body = pendingReflectionsBody()
+            // Stable copy across deliveries because the trigger repeats.
+            // Counts would otherwise go stale day-to-day.
+            content.body = "A quiet moment to revisit your path."
             content.userInfo = ["cairn.deeplink": "cairn://path"]
         }
         content.sound = .default
 
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let trigger = makeTrigger(for: reminder)
         return UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger)
     }
 
-    private func pendingReflectionsBody() -> String {
-        let count = pendingReflectionCount()
-        if count == 0 { return "Pause for a moment to reflect." }
-        return "\(count) \(count == 1 ? "moment is" : "moments are") waiting to be revisited."
+    private func makeTrigger(for reminder: ScheduledReminder) -> UNNotificationTrigger {
+        let calendar = Calendar.current
+        switch reminder.kind {
+        case .notice:
+            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fireDate)
+            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        case .reflect:
+            let components = calendar.dateComponents([.hour, .minute], from: reminder.fireDate)
+            return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        }
     }
 
     private func pendingReflectionCount() -> Int {

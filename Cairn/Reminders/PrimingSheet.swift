@@ -31,10 +31,11 @@ struct PrimingSheet: View {
         .padding(.horizontal, CairnSpacing.size5)
         .padding(.top, CairnSpacing.size3)
         .padding(.bottom, CairnSpacing.size8)
-        .frame(maxWidth: .infinity)
-        .background(Color.cairnSurfaceOverlay)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
+        .presentationBackground(Color.cairnSurfaceOverlay)
+        .preferredColorScheme(.light)
     }
 
     private var handle: some View {

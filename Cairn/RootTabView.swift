@@ -10,6 +10,8 @@ enum CairnTab: Hashable {
 
 struct RootTabView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
+        .encode(RemindersSettings())
     @State private var selection: CairnTab = .capture
     @State private var remindersService = RemindersService()
 
@@ -35,8 +37,12 @@ struct RootTabView: View {
         }
         .tint(.cairnAccent)
         .environment(remindersService)
-        .onAppear {
+        .task {
             remindersService.attach(modelContainer: modelContext.container)
+            let settings = RemindersSettings.decode(settingsData)
+            if settings.anyEnabled {
+                await remindersService.reschedule(settings: settings)
+            }
         }
         .onChange(of: remindersService.lastDeepLinkURL) { _, url in
             guard let url else { return }

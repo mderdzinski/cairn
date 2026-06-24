@@ -23,10 +23,12 @@ struct RemindersView: View {
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @Environment(RemindersService.self) private var remindersService
+    @Environment(\.openURL) private var openURL
     @Query private var moments: [Moment]
     @State private var activeSheet: ActiveSheet?
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
+    @State private var showsDeniedAlert = false
 
     private var settings: Binding<RemindersSettings> {
         Binding(
@@ -77,6 +79,16 @@ struct RemindersView: View {
             let decoded = RemindersSettings.decode(newValue)
             Task { await remindersService.reschedule(settings: decoded) }
         }
+        .alert("Notifications are off in Settings", isPresented: $showsDeniedAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Cairn can't send reminders until notifications are allowed for Cairn in iOS Settings.")
+        }
     }
 
     private func toggleBinding(for target: PendingToggle) -> Binding<Bool> {
@@ -86,19 +98,51 @@ struct RemindersView: View {
                 return target == .notice ? current.noticeEnabled : current.reflectEnabled
             },
             set: { newValue in
-                var current = settings.wrappedValue
-                if newValue, !current.hasPrimedPermission {
-                    pendingToggle = target
-                    isPriming = true
+                if newValue {
+                    Task { await beginEnable(target: target) }
                     return
                 }
-                switch target {
-                case .notice: current.noticeEnabled = newValue
-                case .reflect: current.reflectEnabled = newValue
-                }
-                settings.wrappedValue = current
+                applyToggle(target: target, on: false)
             }
         )
+    }
+
+    private func beginEnable(target: PendingToggle) async {
+        let status = await remindersService.authorizationStatus()
+        switch status {
+        case .denied:
+            await MainActor.run { showsDeniedAlert = true }
+        case .notDetermined:
+            await MainActor.run {
+                pendingToggle = target
+                isPriming = true
+            }
+        case .authorized, .provisional, .ephemeral:
+            await MainActor.run {
+                var current = settings.wrappedValue
+                current.hasPrimedPermission = true
+                applyToggle(target: target, on: true, into: &current)
+                settings.wrappedValue = current
+            }
+        @unknown default:
+            await MainActor.run {
+                pendingToggle = target
+                isPriming = true
+            }
+        }
+    }
+
+    private func applyToggle(target: PendingToggle, on: Bool) {
+        var current = settings.wrappedValue
+        applyToggle(target: target, on: on, into: &current)
+        settings.wrappedValue = current
+    }
+
+    private func applyToggle(target: PendingToggle, on: Bool, into current: inout RemindersSettings) {
+        switch target {
+        case .notice: current.noticeEnabled = on
+        case .reflect: current.reflectEnabled = on
+        }
     }
 
     private func primingAllowed() async {
@@ -106,15 +150,15 @@ struct RemindersView: View {
         var current = settings.wrappedValue
         current.hasPrimedPermission = true
         if granted, let target = pendingToggle {
-            switch target {
-            case .notice: current.noticeEnabled = true
-            case .reflect: current.reflectEnabled = true
-            }
+            applyToggle(target: target, on: true, into: &current)
         }
         settings.wrappedValue = current
         await MainActor.run {
             pendingToggle = nil
             isPriming = false
+            if !granted {
+                showsDeniedAlert = true
+            }
         }
     }
 
@@ -228,11 +272,10 @@ struct RemindersView: View {
     }
 
     private var reflectHelperText: String {
-        let base = "Sent only when moments are waiting"
         if pendingCount > 0 {
-            return base + " — \(pendingCount) right now. If there's nothing to revisit, no reminder."
+            return "\(pendingCount) waiting right now. Sent at your chosen time; the body adapts to what's pending then."
         }
-        return base + ". If there's nothing to revisit, no reminder."
+        return "Sent at your chosen time; gentler copy when nothing is waiting."
     }
 
     private var reflectPreviewBody: String {

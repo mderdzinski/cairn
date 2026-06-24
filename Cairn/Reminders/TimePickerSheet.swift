@@ -28,20 +28,18 @@ struct TimePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.cairnPaper.ignoresSafeArea()
-                VStack(spacing: CairnSpacing.size4) {
-                    if endMinutes != nil {
-                        pickerRow(label: "Start", selection: $startDate)
-                        Divider().padding(.horizontal, CairnSpacing.size4)
-                        pickerRow(label: "End", selection: $endDate)
-                    } else {
-                        pickerRow(label: nil, selection: $startDate)
-                    }
-                    Spacer()
+            VStack(spacing: CairnSpacing.size4) {
+                if endMinutes != nil {
+                    pickerRow(label: "Start", selection: $startDate)
+                    Divider().padding(.horizontal, CairnSpacing.size4)
+                    pickerRow(label: "End", selection: $endDate)
+                } else {
+                    pickerRow(label: nil, selection: $startDate)
                 }
-                .padding(.top, CairnSpacing.size5)
+                Spacer()
             }
+            .padding(.top, CairnSpacing.size5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -54,9 +52,14 @@ struct TimePickerSheet: View {
                     .foregroundStyle(Color.cairnAccentInk)
                 }
             }
+            .toolbarBackground(Color.cairnSurfaceOverlay, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
         }
         .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
+        .presentationBackground(Color.cairnPaper)
+        .preferredColorScheme(.light)
     }
 
     private func pickerRow(label: String?, selection: Binding<Date>) -> some View {
