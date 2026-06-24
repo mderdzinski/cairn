@@ -20,7 +20,6 @@ struct RemindersView: View {
         .encode(RemindersSettings())
     @Environment(RemindersService.self) private var remindersService
     @Environment(\.openURL) private var openURL
-    @Query private var moments: [Moment]
     @State private var expandedRow: ExpandedRow?
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
@@ -35,12 +34,6 @@ struct RemindersView: View {
             get: { RemindersSettings.decode(settingsData) },
             set: { settingsData = RemindersSettings.encode($0) }
         )
-    }
-
-    private var pendingCount: Int {
-        moments.lazy.filter {
-            ($0.reflection ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }.count
     }
 
     var body: some View {
@@ -165,7 +158,7 @@ struct RemindersView: View {
     }
 
     private var intro: some View {
-        Text("Cairn can gently remind you to notice — and to revisit what's waiting. Both are off until you ask.")
+        Text("Gentle reminders to notice, and to revisit what's waiting.")
             .font(.cairnSerif(size: 17, weight: .regular))
             .foregroundStyle(Color.cairnTextSecondary)
             .lineSpacing(2)
@@ -192,7 +185,7 @@ struct RemindersView: View {
                     minutes: activeEndBinding,
                     isExpanded: expandedBinding(for: .activeEnd)
                 )
-                Text("Reminders only arrive inside this window — never while you're asleep.")
+                Text("Reminders only arrive inside this window.")
                     .font(.cairnLabel)
                     .foregroundStyle(Color.cairnTextTertiary)
                     .lineSpacing(1)
@@ -266,10 +259,7 @@ struct RemindersView: View {
     }
 
     private var reflectHelperText: String {
-        if pendingCount > 0 {
-            return "A daily nudge at your chosen time — \(pendingCount) waiting to revisit right now."
-        }
-        return "A daily nudge at your chosen time — a quiet moment to come back to your path."
+        "A daily nudge at your chosen time."
     }
 
     private var reflectPreviewBody: String {
