@@ -13,6 +13,17 @@
 		<string>HankenGrotesk-Variable.ttf</string>
 		<string>SplineSansMono-Variable.ttf</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.markderdzinski.Cairn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cairn</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
