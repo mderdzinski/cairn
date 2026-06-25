@@ -40,11 +40,7 @@ struct TimelineView: View {
     @ViewBuilder
     private var content: some View {
         if moments.isEmpty {
-            ContentUnavailableView(
-                "No moments yet",
-                systemImage: "mountain.2",
-                description: Text("Capture your first moment to see it here.")
-            )
+            emptyState
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -122,6 +118,23 @@ struct TimelineView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: CairnSpacing.size3) {
+            Image(systemName: "mountain.2")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(Color.cairnTextTertiary)
+            Text("No moments yet")
+                .font(.cairnSerif(size: 18, weight: .regular))
+                .foregroundStyle(Color.cairnTextPrimary)
+            Text("Capture your first moment to see it here.")
+                .font(.cairnLabel)
+                .foregroundStyle(Color.cairnTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, CairnSpacing.size12)
     }
 
     private var grouped: [Date: [Moment]] {
