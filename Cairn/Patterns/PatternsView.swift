@@ -24,10 +24,18 @@ struct PatternsView: View {
     }
 }
 
+private struct DigestKey: Equatable {
+    let count: Int
+    let last: Date?
+    let range: PatternsRange
+}
+
 private struct PatternsContent: View {
     @Binding var range: PatternsRange
+    @Environment(\.modelContext) private var modelContext
     @Query private var moments: [Moment]
-    @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
+    @State private var hasAnyMoments: Bool = true
+    @State private var digest: PatternsDigest?
 
     init(range: Binding<PatternsRange>) {
         _range = range
@@ -39,17 +47,13 @@ private struct PatternsContent: View {
         )
     }
 
-    private var digest: PatternsDigest {
-        PatternsDigest(moments: moments, range: range)
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CairnSpacing.size5) {
                 header
                 if moments.isEmpty {
                     emptyState
-                } else {
+                } else if let digest {
                     WeeklyTotalCard(digest: digest)
                     RhythmCard(daily: digest.daily, range: range)
                     BreakdownCard(breakdown: digest.breakdown)
@@ -60,6 +64,20 @@ private struct PatternsContent: View {
             .padding(.bottom, CairnSpacing.size12)
         }
         .scrollContentBackground(.hidden)
+        .task(id: DigestKey(count: moments.count, last: moments.first?.timestamp, range: range)) {
+            digest = PatternsDigest(moments: moments, range: range)
+        }
+        .task {
+            refreshHasAnyMoments()
+        }
+        .onChange(of: moments.count) { _, _ in
+            refreshHasAnyMoments()
+        }
+    }
+
+    private func refreshHasAnyMoments() {
+        let count = (try? modelContext.fetchCount(FetchDescriptor<Moment>())) ?? 0
+        hasAnyMoments = count > 0
     }
 
     private var header: some View {
@@ -106,11 +124,11 @@ private struct PatternsContent: View {
     }
 
     private var emptyStateTitle: String {
-        allMoments.isEmpty ? "No moments yet" : "Nothing in this range"
+        hasAnyMoments ? "Nothing in this range" : "No moments yet"
     }
 
     private var emptyStateMessage: String {
-        if allMoments.isEmpty {
+        if !hasAnyMoments {
             return "Capture a moment to start seeing patterns."
         }
         return range == .week

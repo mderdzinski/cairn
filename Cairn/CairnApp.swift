@@ -42,23 +42,7 @@ struct CairnApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView(remindersService: appDelegate.remindersService)
-                .task {
-                    migrateSluggishnessToHeaviness()
-                }
         }
         .modelContainer(sharedModelContainer)
-    }
-
-    @MainActor
-    private func migrateSluggishnessToHeaviness() {
-        let context = ModelContext(sharedModelContainer)
-        let descriptor = FetchDescriptor<Moment>(
-            predicate: #Predicate { $0.categoryRaw == "sluggishness" }
-        )
-        guard let stale = try? context.fetch(descriptor), !stale.isEmpty else { return }
-        for moment in stale {
-            moment.categoryRaw = MomentCategory.heaviness.rawValue
-        }
-        try? context.save()
     }
 }
