@@ -17,11 +17,10 @@ struct WatchRootView: View {
 
     init() {
         let startOfDay = Calendar.current.startOfDay(for: .now)
-        var descriptor = FetchDescriptor<Moment>(
+        let descriptor = FetchDescriptor<Moment>(
             predicate: #Predicate { $0.timestamp >= startOfDay },
             sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
         )
-        descriptor.fetchLimit = 7
         _todayMoments = Query(descriptor)
     }
 
