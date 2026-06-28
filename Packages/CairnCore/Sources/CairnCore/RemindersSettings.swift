@@ -20,6 +20,10 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
         }
     }
 
+    /// Schema version of the persisted blob. Bump when adding a field that
+    /// requires a migration; defaults to ``currentSchemaVersion`` for fresh installs
+    /// and any blob written before versioning landed.
+    public var schemaVersion: Int
     public var noticeEnabled: Bool
     public var reflectEnabled: Bool
     public var freq: Frequency
@@ -29,8 +33,10 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
     public var hasPrimedPermission: Bool
 
     public static let storageKey = "cairn.reminders"
+    public static let currentSchemaVersion = 1
 
     public init(
+        schemaVersion: Int = RemindersSettings.currentSchemaVersion,
         noticeEnabled: Bool = false,
         reflectEnabled: Bool = false,
         freq: Frequency = .once,
@@ -39,6 +45,7 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
         reflectTime: Int = 20 * 60,
         hasPrimedPermission: Bool = false
     ) {
+        self.schemaVersion = schemaVersion
         self.noticeEnabled = noticeEnabled
         self.reflectEnabled = reflectEnabled
         self.freq = freq
@@ -52,8 +59,34 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
         (try? JSONEncoder().encode(settings)) ?? Data()
     }
 
+    /// Decode a settings blob, preserving as many user-configured fields as possible.
+    ///
+    /// Strict decode succeeds → return as-is.
+    /// Strict decode fails but the blob is a JSON object → keep every field that
+    /// decodes cleanly, fill the rest from defaults. This prevents a forward-incompatible
+    /// or partially corrupted blob from silently wiping a user's whole configuration.
+    /// Blob is unreadable JSON → return defaults.
     public static func decode(_ data: Data) -> RemindersSettings {
-        (try? JSONDecoder().decode(RemindersSettings.self, from: data)) ?? RemindersSettings()
+        if let strict = try? JSONDecoder().decode(RemindersSettings.self, from: data) {
+            return strict
+        }
+        guard
+            let raw = try? JSONSerialization.jsonObject(with: data),
+            let object = raw as? [String: Any]
+        else {
+            return RemindersSettings()
+        }
+        let defaults = RemindersSettings()
+        return RemindersSettings(
+            schemaVersion: object["schemaVersion"] as? Int ?? defaults.schemaVersion,
+            noticeEnabled: object["noticeEnabled"] as? Bool ?? defaults.noticeEnabled,
+            reflectEnabled: object["reflectEnabled"] as? Bool ?? defaults.reflectEnabled,
+            freq: (object["freq"] as? String).flatMap(Frequency.init(rawValue:)) ?? defaults.freq,
+            activeHoursStart: object["activeHoursStart"] as? Int ?? defaults.activeHoursStart,
+            activeHoursEnd: object["activeHoursEnd"] as? Int ?? defaults.activeHoursEnd,
+            reflectTime: object["reflectTime"] as? Int ?? defaults.reflectTime,
+            hasPrimedPermission: object["hasPrimedPermission"] as? Bool ?? defaults.hasPrimedPermission
+        )
     }
 }
 
