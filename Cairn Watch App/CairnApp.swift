@@ -5,15 +5,12 @@ import SwiftUI
 @main
 struct CairnWatchApp: App {
     private let sharedModelContainer: ModelContainer = {
-        let schema = Schema([Moment.self])
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .private("iCloud.com.markderdzinski.Cairn")
-        )
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try MomentStore.makeContainer(
+                cloudKitContainerID: "iCloud.com.markderdzinski.Cairn"
+            ).container
         } catch {
+            // Both CloudKit and local persistence failed — genuinely unrecoverable.
             fatalError("Failed to create Cairn ModelContainer: \(error)")
         }
     }()
