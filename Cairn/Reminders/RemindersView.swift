@@ -42,6 +42,9 @@ struct RemindersView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CairnSpacing.size4) {
                     intro
+                    if remindersService.lastScheduleFailure != nil {
+                        scheduleFailureBanner
+                    }
                     noticeCard
                     reflectCard
                 }
@@ -163,6 +166,36 @@ struct RemindersView: View {
             .foregroundStyle(Color.cairnTextSecondary)
             .lineSpacing(2)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var scheduleFailureBanner: some View {
+        HStack(alignment: .top, spacing: CairnSpacing.size2) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.cairnStone600)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: CairnSpacing.size1) {
+                Text("Reminders couldn't be scheduled")
+                    .font(.cairnLabel.weight(.semibold))
+                    .foregroundStyle(Color.cairnTextPrimary)
+                Text("iOS rejected one or more reminder requests. Try again, or check Notification settings.")
+                    .font(.cairnLabel)
+                    .foregroundStyle(Color.cairnTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Retry") {
+                    let decoded = RemindersSettings.decode(settingsData)
+                    Task { await remindersService.reschedule(settings: decoded) }
+                }
+                .font(.cairnLabel.weight(.medium))
+                .foregroundStyle(Color.cairnAccentInk)
+                .padding(.top, CairnSpacing.size1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, CairnSpacing.size3)
+        .padding(.horizontal, CairnSpacing.size3)
+        .background(Color.cairnStone100)
+        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.medium))
     }
 
     private var noticeCard: some View {
@@ -322,10 +355,20 @@ struct RemindersView: View {
     }
 }
 
-#Preview {
+#Preview("Default") {
     NavigationStack {
         RemindersView()
             .modelContainer(for: Moment.self, inMemory: true)
             .environment(RemindersService())
+    }
+}
+
+#Preview("Scheduling failure") {
+    let service = RemindersService()
+    service.lastScheduleFailure = ScheduleFailure(failedCount: 2, totalCount: 3)
+    return NavigationStack {
+        RemindersView()
+            .modelContainer(for: Moment.self, inMemory: true)
+            .environment(service)
     }
 }
