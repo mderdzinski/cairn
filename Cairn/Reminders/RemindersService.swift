@@ -1,13 +1,26 @@
 import CairnCore
 import Foundation
+import os
 import UserNotifications
+
+/// A failure observed while scheduling reminder notifications. Used by
+/// ``RemindersView`` to surface a retry affordance instead of silently leaving
+/// the user with no reminders.
+struct ScheduleFailure: Equatable {
+    var failedCount: Int
+    var totalCount: Int
+}
 
 @MainActor
 @Observable
 final class RemindersService: NSObject {
     private let center = UNUserNotificationCenter.current()
+    private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Reminders")
     private var rescheduleGeneration: UInt64 = 0
     var lastDeepLinkURL: URL?
+    /// Non-nil when the most recent ``reschedule(settings:now:)`` call had at least one
+    /// notification request fail to register. Cleared by the next successful call.
+    var lastScheduleFailure: ScheduleFailure?
 
     func requestAuthorization() async -> Bool {
         do {
@@ -29,7 +42,10 @@ final class RemindersService: NSObject {
         // A newer call landed while we awaited cancel — bail before
         // re-adding stale requests on top of the newer batch's work.
         guard generation == rescheduleGeneration else { return }
-        guard settings.anyEnabled else { return }
+        guard settings.anyEnabled else {
+            lastScheduleFailure = nil
+            return
+        }
 
         var random = SystemRandomNumberGenerator()
         let scheduled = RemindersScheduler.compute(
@@ -38,11 +54,24 @@ final class RemindersService: NSObject {
             randomSource: &random
         )
 
+        var failedCount = 0
         for reminder in scheduled {
             guard generation == rescheduleGeneration else { return }
             let request = makeRequest(reminder: reminder)
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+            } catch {
+                failedCount += 1
+                logger.error("Failed to schedule \(reminder.identifier): \(error.localizedDescription)")
+            }
         }
+
+        // Only publish the final tally for the latest generation — a newer call
+        // that landed mid-loop will own this state when it finishes.
+        guard generation == rescheduleGeneration else { return }
+        lastScheduleFailure = failedCount > 0
+            ? ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
+            : nil
     }
 
     func cancelAll() async {
