@@ -21,28 +21,26 @@ final class CairnAppDelegate: NSObject, UIApplicationDelegate {
 struct CairnApp: App {
     @UIApplicationDelegateAdaptor(CairnAppDelegate.self) private var appDelegate
 
-    private let sharedModelContainer: ModelContainer = {
-        let schema = Schema([Moment.self])
+    private let storeResult: MomentStoreResult = {
         let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        let configuration =
-            isUnderXCTest
-                ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-                : ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .private("iCloud.com.markderdzinski.Cairn")
-                )
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try MomentStore.makeContainer(
+                cloudKitContainerID: "iCloud.com.markderdzinski.Cairn",
+                inMemory: isUnderXCTest
+            )
         } catch {
+            // Both CloudKit and local persistence failed — genuinely unrecoverable.
             fatalError("Failed to create Cairn ModelContainer: \(error)")
         }
     }()
 
     var body: some Scene {
         WindowGroup {
-            RootTabView(remindersService: appDelegate.remindersService)
+            RootTabView(
+                remindersService: appDelegate.remindersService,
+                storeBacking: storeResult.backing
+            )
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(storeResult.container)
     }
 }
