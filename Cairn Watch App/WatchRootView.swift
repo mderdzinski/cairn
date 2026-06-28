@@ -11,12 +11,21 @@ enum WatchScreen: Equatable {
 
 struct WatchRootView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
+    @Query private var todayMoments: [Moment]
     @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
 
+    init() {
+        let startOfDay = Calendar.current.startOfDay(for: .now)
+        let descriptor = FetchDescriptor<Moment>(
+            predicate: #Predicate { $0.timestamp >= startOfDay },
+            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+        )
+        _todayMoments = Query(descriptor)
+    }
+
     private var todaysMomentCount: Int {
-        allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
+        todayMoments.count
     }
 
     var body: some View {
@@ -48,8 +57,8 @@ struct WatchRootView: View {
     }
 
     private func handleCapture(_ category: MomentCategory) {
-        modelContext.insert(Moment(category: category))
         WKInterfaceDevice.current().play(.click)
+        modelContext.insert(Moment(category: category))
         withAnimation { screen = .confirm(category) }
         dismissTask?.cancel()
         dismissTask = Task { @MainActor in

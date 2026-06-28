@@ -14,9 +14,10 @@ struct CaptureView: View {
     @Binding var path: NavigationPath
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Moment.timestamp, order: .reverse) private var allMoments: [Moment]
+    @Query private var todayMoments: [Moment]
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
+    @State private var feedback = UIImpactFeedbackGenerator(style: .medium)
 
     init(
         onSeePath: @escaping () -> Void = {},
@@ -26,10 +27,16 @@ struct CaptureView: View {
         self.onSeePath = onSeePath
         self.onRoute = onRoute
         _path = path
+        let startOfDay = Calendar.current.startOfDay(for: .now)
+        let descriptor = FetchDescriptor<Moment>(
+            predicate: #Predicate { $0.timestamp >= startOfDay },
+            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+        )
+        _todayMoments = Query(descriptor)
     }
 
     private var todaysMomentCount: Int {
-        allMoments.filter { Calendar.current.isDateInToday($0.timestamp) }.count
+        todayMoments.count
     }
 
     private let columns = [
@@ -65,6 +72,7 @@ struct CaptureView: View {
                 case .reminders: RemindersView(onPreviewTap: onRoute)
                 }
             }
+            .task { feedback.prepare() }
         }
     }
 
@@ -168,9 +176,8 @@ struct CaptureView: View {
     }
 
     private func capture(_ category: MomentCategory) {
-        let moment = Moment(category: category)
-        modelContext.insert(moment)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        feedback.impactOccurred()
+        modelContext.insert(Moment(category: category))
 
         toastTask?.cancel()
         withAnimation(.easeOut(duration: 0.18)) {
@@ -184,6 +191,7 @@ struct CaptureView: View {
                 }
             }
         }
+        feedback.prepare()
     }
 }
 

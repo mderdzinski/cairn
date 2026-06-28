@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 public final class Moment {
+    #Index<Moment>([\.timestamp])
+
     public var id: UUID = UUID()
     public var timestamp: Date = Date()
     public var categoryRaw: String = MomentCategory.contentment.rawValue
