@@ -27,6 +27,9 @@ struct TimelineView: View {
                         .font(.cairnTitle)
                         .foregroundStyle(Color.cairnTextPrimary)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SyncStatusPip(status: syncMonitor.status)
+                }
             }
             .sheet(item: $reflectingMoment) { moment in
                 ReflectSheet(
@@ -60,14 +63,11 @@ struct TimelineView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: CairnSpacing.size1) {
-                HStack(spacing: CairnSpacing.size2) {
-                    Text("Your path")
-                        .font(.cairnEyebrow)
-                        .tracking(CairnTracking.eyebrowCaps)
-                        .foregroundStyle(Color.cairnTextTertiary)
-                        .textCase(.uppercase)
-                    SyncStatusPip(status: syncMonitor.status)
-                }
+                Text("Your path")
+                    .font(.cairnEyebrow)
+                    .tracking(CairnTracking.eyebrowCaps)
+                    .foregroundStyle(Color.cairnTextTertiary)
+                    .textCase(.uppercase)
                 Text("\(moments.count) \(moments.count == 1 ? "moment" : "moments")")
                     .font(.cairnSerif(size: 28, weight: .light))
                     .foregroundStyle(Color.cairnTextPrimary)
