@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "cairn-app-icon-1024.png",
+      "filename" : "cairn-app-icon-dark-1024.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "cairn-app-icon-1024.png",
+      "filename" : "cairn-app-icon-tinted-1024.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
