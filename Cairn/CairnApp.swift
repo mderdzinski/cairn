@@ -21,8 +21,24 @@ final class CairnAppDelegate: NSObject, UIApplicationDelegate {
 struct CairnApp: App {
     @UIApplicationDelegateAdaptor(CairnAppDelegate.self) private var appDelegate
 
+    private let storeResult: MomentStoreResult
+    @State private var syncMonitor: SyncStatusMonitor
+
     init() {
         CairnApp.migrateOnboardingFlagForUpgradedInstalls()
+        let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let result: MomentStoreResult
+        do {
+            result = try MomentStore.makeContainer(
+                cloudKitContainerID: "iCloud.com.markderdzinski.Cairn",
+                inMemory: isUnderXCTest
+            )
+        } catch {
+            // Both CloudKit and local persistence failed — genuinely unrecoverable.
+            fatalError("Failed to create Cairn ModelContainer: \(error)")
+        }
+        storeResult = result
+        _syncMonitor = State(wrappedValue: SyncStatusMonitor(backing: result.backing))
     }
 
     /// Pre-render migration so users who already configured reminders on a prior
@@ -39,25 +55,13 @@ struct CairnApp: App {
         }
     }
 
-    private let storeResult: MomentStoreResult = {
-        let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        do {
-            return try MomentStore.makeContainer(
-                cloudKitContainerID: "iCloud.com.markderdzinski.Cairn",
-                inMemory: isUnderXCTest
-            )
-        } catch {
-            // Both CloudKit and local persistence failed — genuinely unrecoverable.
-            fatalError("Failed to create Cairn ModelContainer: \(error)")
-        }
-    }()
-
     var body: some Scene {
         WindowGroup {
             RootTabView(
                 remindersService: appDelegate.remindersService,
                 storeBacking: storeResult.backing
             )
+            .environment(syncMonitor)
             .preferredColorScheme(.light)
         }
         .modelContainer(storeResult.container)

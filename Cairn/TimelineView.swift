@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncStatusMonitor.self) private var syncMonitor
     @Query(sort: \Moment.timestamp, order: .reverse)
     private var moments: [Moment]
     @State private var reflectingMoment: Moment?
@@ -25,6 +26,10 @@ struct TimelineView: View {
                     Text("Path")
                         .font(.cairnTitle)
                         .foregroundStyle(Color.cairnTextPrimary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SyncStatusPip(status: syncMonitor.status)
+                        .allowsHitTesting(false)
                 }
             }
             .sheet(item: $reflectingMoment) { moment in
@@ -162,4 +167,5 @@ struct TimelineView: View {
 #Preview {
     TimelineView()
         .modelContainer(for: Moment.self, inMemory: true)
+        .environment(SyncStatusMonitor(backing: .inMemory))
 }
