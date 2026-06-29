@@ -35,7 +35,6 @@ struct PrimingSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
         .presentationBackground(Color.cairnSurfaceOverlay)
-        .preferredColorScheme(.light)
     }
 
     private var handle: some View {
