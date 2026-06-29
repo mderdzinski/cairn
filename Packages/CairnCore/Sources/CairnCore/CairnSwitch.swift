@@ -37,6 +37,7 @@ public struct CairnSwitch: View {
     public let label: String?
     public let isDisabled: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPressed = false
 
     public init(
@@ -78,8 +79,8 @@ public struct CairnSwitch: View {
                     .scaleEffect(isPressed ? 0.94 : 1.0)
                     .offset(x: size.inset + (isOn ? size.travel : 0))
             }
-            .animation(.easeOut(duration: 0.18), value: isOn)
-            .animation(.easeOut(duration: 0.12), value: isPressed)
+            .motionAwareAnimation(.easeOut(duration: 0.18), value: isOn, reduceMotion: reduceMotion)
+            .motionAwareAnimation(.easeOut(duration: 0.12), value: isPressed, reduceMotion: reduceMotion)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)

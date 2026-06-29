@@ -49,18 +49,35 @@ public struct CairnButtonStyle: ButtonStyle {
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(size.font.weight(.semibold))
-            .foregroundStyle(foreground(pressed: configuration.isPressed))
-            .padding(.horizontal, size.horizontalPadding)
-            .padding(.vertical, CairnSpacing.size3)
-            .frame(maxWidth: block ? .infinity : nil)
-            .frame(minHeight: size.minHeight)
-            .background(background(pressed: configuration.isPressed))
-            .overlay(border)
-            .clipShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        // Wrapper view so we can read accessibilityReduceMotion from @Environment —
+        // ButtonStyle.makeBody itself is not a View context and can't.
+        StyledLabel(configuration: configuration, style: self)
+    }
+
+    private struct StyledLabel: View {
+        let configuration: Configuration
+        let style: CairnButtonStyle
+
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .font(style.size.font.weight(.semibold))
+                .foregroundStyle(style.foreground(pressed: configuration.isPressed))
+                .padding(.horizontal, style.size.horizontalPadding)
+                .padding(.vertical, CairnSpacing.size3)
+                .frame(maxWidth: style.block ? .infinity : nil)
+                .frame(minHeight: style.size.minHeight)
+                .background(style.background(pressed: configuration.isPressed))
+                .overlay(style.border)
+                .clipShape(Capsule())
+                .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+                .motionAwareAnimation(
+                    .easeOut(duration: 0.12),
+                    value: configuration.isPressed,
+                    reduceMotion: reduceMotion
+                )
+        }
     }
 
     private func foreground(pressed _: Bool) -> Color {
