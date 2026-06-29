@@ -1,10 +1,11 @@
 import CairnCore
 import SwiftUI
 
-/// Quiet sync indicator for the Path toolbar. Every visible state carries a small
-/// label so the dot is never an isolated mystery — a sage dot + "Synced" when fresh,
-/// a stone dot + relative time when stale, an exclamation glyph + "Sync issue" on
-/// failure. Hidden entirely when CloudKit isn't running.
+/// Quiet sync indicator for the Path toolbar. Only renders when there's something
+/// the user might want to know — a stone dot + relative time when sync is stale, a
+/// sage dot + "Syncing" when in flight, an exclamation glyph + "Sync issue" on
+/// failure. Silent when sync is fresh, idle, or disabled — silence is the signal
+/// that everything is working.
 struct SyncStatusPip: View {
     let status: SyncStatus
     /// When the last successful sync is older than this, the relative time is shown
@@ -29,7 +30,7 @@ struct SyncStatusPip: View {
             label(dot: .cairnAccent, text: "Syncing", accessible: "Syncing now")
         case .synced(let date):
             if now.timeIntervalSince(date) < staleAfter {
-                label(dot: .cairnAccent, text: "Synced", accessible: "Synced")
+                EmptyView()
             } else {
                 label(
                     dot: .cairnStone400,
