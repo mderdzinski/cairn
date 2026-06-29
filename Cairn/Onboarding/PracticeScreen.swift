@@ -12,32 +12,40 @@ struct PracticeScreen: View {
             Color.cairnPaper.ignoresSafeArea()
             litStoneBackdrop
 
-            VStack(spacing: CairnSpacing.size8) {
-                Spacer()
-                StoneStack(count: 6, size: .large)
-                    .onboardingEntrance(duration: 0.5)
-                VStack(spacing: CairnSpacing.size3) {
-                    Text("A quiet practice of noticing.")
-                        .font(.cairnSerif(size: 30, weight: .light))
-                        .tracking(CairnTracking.displayTight)
-                        .foregroundStyle(Color.cairnTextPrimary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(2)
-                    Text("Notice a moment. Mark it in a second. Return to it when you’re ready.")
-                        .font(.cairnBody)
-                        .foregroundStyle(Color.cairnTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(2)
-                        .frame(maxWidth: 280)
+            GeometryReader { geo in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: CairnSpacing.size8) {
+                        StoneStack(count: 6, size: .large)
+                            .onboardingEntrance(duration: 0.5)
+                        VStack(spacing: CairnSpacing.size3) {
+                            Text("A quiet practice of noticing.")
+                                .font(.cairnSerif(size: 30, weight: .light))
+                                .tracking(CairnTracking.displayTight)
+                                .foregroundStyle(Color.cairnTextPrimary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(2)
+                            Text("Notice a moment. Mark it in a second. Return to it when you’re ready.")
+                                .font(.cairnBody)
+                                .foregroundStyle(Color.cairnTextSecondary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(2)
+                                .frame(maxWidth: 280)
+                        }
+                        .padding(.horizontal, CairnSpacing.gutter)
+                        .onboardingEntrance(delay: 0.2)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
                 }
-                .padding(.horizontal, CairnSpacing.gutter)
-                .onboardingEntrance(delay: 0.2)
-                Spacer()
-                PageDots(current: currentPage, total: pageCount)
-                Button("Next", action: onNext)
-                    .buttonStyle(CairnButtonStyle(.primary, size: .large, block: true))
-                    .padding(.horizontal, CairnSpacing.gutter)
-                    .padding(.bottom, CairnSpacing.size6)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    PageDots(current: currentPage, total: pageCount)
+                    Button("Next", action: onNext)
+                        .buttonStyle(CairnButtonStyle(.primary, size: .large, block: true))
+                        .padding(.horizontal, CairnSpacing.gutter)
+                        .padding(.bottom, CairnSpacing.size6)
+                }
+                .background(Color.cairnPaper)
             }
 
             SkipButton(action: onSkip)
@@ -65,13 +73,19 @@ struct PageDots: View {
     let current: Int
     let total: Int
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0 ..< total, id: \.self) { index in
                 Capsule()
                     .fill(index == current ? Color.cairnAccent : Color.cairnBorderStrong)
                     .frame(width: index == current ? 18 : 6, height: 6)
-                    .animation(.easeOut(duration: 0.3), value: current)
+                    .motionAwareAnimation(
+                        .easeOut(duration: 0.3),
+                        value: current,
+                        reduceMotion: reduceMotion
+                    )
             }
         }
         .padding(.bottom, CairnSpacing.size2)

@@ -112,6 +112,7 @@ struct ReflectSheet: View {
             HStack(spacing: CairnSpacing.size2) {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .regular))
+                    .accessibilityHidden(true)
                 Text("Delete moment")
                     .font(.cairnLabel)
             }
@@ -128,6 +129,7 @@ struct ReflectSheet: View {
             Button(action: save) {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")
+                        .accessibilityHidden(true)
                     Text("Save reflection")
                 }
             }

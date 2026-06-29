@@ -33,6 +33,7 @@ private struct DigestKey: Equatable {
 private struct PatternsContent: View {
     @Binding var range: PatternsRange
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var moments: [Moment]
     @State private var hasAnyMoments: Bool = true
     @State private var digest: PatternsDigest?
@@ -97,7 +98,7 @@ private struct PatternsContent: View {
                         isSelected: range == option,
                         isSelectable: true
                     ) {
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.2)) {
                             range = option
                         }
                     }
@@ -111,6 +112,7 @@ private struct PatternsContent: View {
             Image(systemName: "chart.bar")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(Color.cairnTextTertiary)
+                .accessibilityHidden(true)
             Text(emptyStateTitle)
                 .font(.cairnSerif(size: 18, weight: .regular))
                 .foregroundStyle(Color.cairnTextPrimary)

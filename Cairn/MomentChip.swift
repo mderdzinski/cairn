@@ -19,6 +19,8 @@ struct MomentChip: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(
         category: MomentCategory,
         size: ChipSize = .medium,
@@ -45,7 +47,7 @@ struct MomentChip: View {
                     .foregroundStyle(CairnCategoryPalette.ink(category))
             }
         }
-        .buttonStyle(MomentChipButtonStyle())
+        .buttonStyle(MomentChipButtonStyle(reduceMotion: reduceMotion))
         .accessibilityLabel(Text(category.displayName))
         .accessibilityHint(Text(category.summary))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -53,10 +55,16 @@ struct MomentChip: View {
 }
 
 private struct MomentChipButtonStyle: ButtonStyle {
+    let reduceMotion: Bool
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .offset(y: configuration.isPressed ? 1 : 0)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.95 : 1.0)
+            .offset(y: configuration.isPressed && !reduceMotion ? 1 : 0)
+            .motionAwareAnimation(
+                .easeOut(duration: 0.14),
+                value: configuration.isPressed,
+                reduceMotion: reduceMotion
+            )
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct WatchConfirmView: View {
     let category: MomentCategory
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
 
     var body: some View {
@@ -26,7 +27,7 @@ struct WatchConfirmView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.cairnPaper)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.42)) {
+            MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.42)) {
                 appeared = true
             }
         }

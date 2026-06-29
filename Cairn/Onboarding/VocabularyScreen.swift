@@ -7,6 +7,7 @@ struct VocabularyScreen: View {
     let currentPage: Int
     let pageCount: Int
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selected: MomentCategory = .heaviness
 
     private let columns = [
@@ -18,46 +19,54 @@ struct VocabularyScreen: View {
         ZStack(alignment: .topTrailing) {
             Color.cairnPaper.ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: CairnSpacing.size3) {
-                Text("Notice what’s here")
-                    .font(.cairnEyebrow)
-                    .tracking(CairnTracking.eyebrowCaps)
-                    .foregroundStyle(Color.cairnTextTertiary)
-                    .textCase(.uppercase)
-                    .padding(.top, CairnSpacing.size6)
-                Text("No moment is good or bad. It just *is*. Tap any stone to see what it holds.")
-                    .font(.cairnBody)
-                    .foregroundStyle(Color.cairnTextSecondary)
-                    .lineSpacing(2)
-                    .padding(.bottom, CairnSpacing.size3)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: CairnSpacing.size3) {
+                    Text("Notice what’s here")
+                        .font(.cairnEyebrow)
+                        .tracking(CairnTracking.eyebrowCaps)
+                        .foregroundStyle(Color.cairnTextTertiary)
+                        .textCase(.uppercase)
+                        .padding(.top, CairnSpacing.size6)
+                    Text("No moment is good or bad. It just *is*. Tap any stone to see what it holds.")
+                        .font(.cairnBody)
+                        .foregroundStyle(Color.cairnTextSecondary)
+                        .lineSpacing(2)
+                        .padding(.bottom, CairnSpacing.size3)
 
-                LazyVGrid(columns: columns, spacing: CairnSpacing.size4) {
-                    ForEach(MomentCategory.allCases, id: \.self) { category in
-                        MomentChip(
-                            category: category,
-                            size: .medium,
-                            isSelected: selected == category
-                        ) {
-                            withAnimation(.easeOut(duration: 0.22)) {
-                                selected = category
+                    LazyVGrid(columns: columns, spacing: CairnSpacing.size4) {
+                        ForEach(MomentCategory.allCases, id: \.self) { category in
+                            MomentChip(
+                                category: category,
+                                size: .medium,
+                                isSelected: selected == category
+                            ) {
+                                MotionGate.animate(
+                                    reduceMotion: reduceMotion,
+                                    .easeOut(duration: 0.22)
+                                ) {
+                                    selected = category
+                                }
                             }
                         }
                     }
+                    .onboardingEntrance(delay: 0.05)
+
+                    glossPanel
+                        .id(selected) // forces crossfade on selection change
+                        .motionAwareTransition(.opacity, reduceMotion: reduceMotion)
                 }
-                .onboardingEntrance(delay: 0.05)
-
-                glossPanel
-                    .id(selected) // forces crossfade on selection change
-                    .transition(.opacity)
-
-                Spacer(minLength: 0)
-
-                PageDots(current: currentPage, total: pageCount)
-                Button("Next", action: onNext)
-                    .buttonStyle(CairnButtonStyle(.primary, size: .large, block: true))
-                    .padding(.bottom, CairnSpacing.size6)
+                .padding(.horizontal, CairnSpacing.gutter)
             }
-            .padding(.horizontal, CairnSpacing.gutter)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    PageDots(current: currentPage, total: pageCount)
+                    Button("Next", action: onNext)
+                        .buttonStyle(CairnButtonStyle(.primary, size: .large, block: true))
+                        .padding(.horizontal, CairnSpacing.gutter)
+                        .padding(.bottom, CairnSpacing.size6)
+                }
+                .background(Color.cairnPaper)
+            }
 
             SkipButton(action: onSkip)
         }

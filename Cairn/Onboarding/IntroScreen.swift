@@ -9,23 +9,30 @@ struct IntroScreen: View {
         ZStack(alignment: .topTrailing) {
             Color.cairnPaper.ignoresSafeArea()
 
-            VStack(spacing: CairnSpacing.size8) {
-                Spacer()
-                StoneStack(count: 1, size: .large)
-                    .onboardingEntrance(duration: 0.5)
-                Text("Most of what we feel passes unmarked.")
-                    .font(.cairnSerif(size: 30, weight: .light))
-                    .tracking(CairnTracking.displayTight)
-                    .foregroundStyle(Color.cairnTextPrimary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(2)
-                    .padding(.horizontal, CairnSpacing.gutter)
-                    .onboardingEntrance(delay: 0.18)
-                Spacer()
+            GeometryReader { geo in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: CairnSpacing.size8) {
+                        StoneStack(count: 1, size: .large)
+                            .onboardingEntrance(duration: 0.5)
+                        Text("Most of what we feel passes unmarked.")
+                            .font(.cairnSerif(size: 30, weight: .light))
+                            .tracking(CairnTracking.displayTight)
+                            .foregroundStyle(Color.cairnTextPrimary)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(2)
+                            .padding(.horizontal, CairnSpacing.gutter)
+                            .onboardingEntrance(delay: 0.18)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button("Begin", action: onNext)
                     .buttonStyle(CairnButtonStyle(.primary, size: .large, block: true))
                     .padding(.horizontal, CairnSpacing.gutter)
+                    .padding(.top, CairnSpacing.size3)
                     .padding(.bottom, CairnSpacing.size6)
+                    .background(Color.cairnPaper)
             }
 
             SkipButton(action: onSkip)

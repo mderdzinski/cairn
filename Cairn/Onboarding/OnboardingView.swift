@@ -3,6 +3,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(RemindersService.self) private var remindersService
     @AppStorage("cairn.hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
@@ -46,7 +47,7 @@ struct OnboardingView: View {
     }
 
     private func advance(to next: Int) {
-        withAnimation(.easeOut(duration: 0.3)) {
+        MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.3)) {
             step = next
         }
     }

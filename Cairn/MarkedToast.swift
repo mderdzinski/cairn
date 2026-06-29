@@ -7,6 +7,7 @@ struct MarkedToast: View {
     var body: some View {
         HStack(spacing: CairnSpacing.size2) {
             CategoryDot(category: category, size: 22, filled: true)
+                .accessibilityHidden(true)
             Text("Marked · \(category.displayName)")
                 .font(.cairnSans(size: 15, weight: .semibold))
                 .foregroundStyle(Color.cairnStone50)
@@ -17,5 +18,7 @@ struct MarkedToast: View {
         .background(Color.cairnStone900, in: Capsule())
         .shadow(color: Color.cairnStone900.opacity(0.18), radius: 18, y: 6)
         .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
     }
 }

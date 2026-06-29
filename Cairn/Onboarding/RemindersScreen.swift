@@ -12,35 +12,40 @@ struct RemindersScreen: View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
 
-            VStack(spacing: CairnSpacing.size6) {
-                Spacer()
-                bellChip
-                    .onboardingEntrance()
-                Text("Want Cairn to tap you on the shoulder?")
-                    .font(.cairnSerif(size: 28, weight: .light))
-                    .tracking(CairnTracking.displayTight)
-                    .foregroundStyle(Color.cairnTextPrimary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(2)
-                    .padding(.horizontal, CairnSpacing.gutter)
-                    .onboardingEntrance(delay: 0.08)
-                VStack(spacing: CairnSpacing.size2) {
-                    ReminderPreviewRow(
-                        icon: "bell",
-                        title: "A nudge to notice",
-                        subtitle: "At a random moment in your day",
-                        isOn: $noticeOn
-                    )
-                    ReminderPreviewRow(
-                        icon: "pencil",
-                        title: "An evening note",
-                        subtitle: "Only when moments are waiting",
-                        isOn: $reflectOn
-                    )
+            GeometryReader { geo in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: CairnSpacing.size6) {
+                        bellChip
+                            .onboardingEntrance()
+                        Text("Want Cairn to tap you on the shoulder?")
+                            .font(.cairnSerif(size: 28, weight: .light))
+                            .tracking(CairnTracking.displayTight)
+                            .foregroundStyle(Color.cairnTextPrimary)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(2)
+                            .padding(.horizontal, CairnSpacing.gutter)
+                            .onboardingEntrance(delay: 0.08)
+                        VStack(spacing: CairnSpacing.size2) {
+                            ReminderPreviewRow(
+                                icon: "bell",
+                                title: "A nudge to notice",
+                                subtitle: "At a random moment in your day",
+                                isOn: $noticeOn
+                            )
+                            ReminderPreviewRow(
+                                icon: "pencil",
+                                title: "An evening note",
+                                subtitle: "Only when moments are waiting",
+                                isOn: $reflectOn
+                            )
+                        }
+                        .padding(.horizontal, CairnSpacing.gutter)
+                        .onboardingEntrance(delay: 0.16)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
                 }
-                .padding(.horizontal, CairnSpacing.gutter)
-                .onboardingEntrance(delay: 0.16)
-                Spacer()
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: CairnSpacing.size2) {
                     Button("Allow reminders") {
                         onAllow(noticeOn, reflectOn)
@@ -50,7 +55,9 @@ struct RemindersScreen: View {
                         .buttonStyle(CairnButtonStyle(.secondary, size: .large, block: true))
                 }
                 .padding(.horizontal, CairnSpacing.gutter)
+                .padding(.top, CairnSpacing.size3)
                 .padding(.bottom, CairnSpacing.size6)
+                .background(Color.cairnPaper)
             }
         }
     }
@@ -74,6 +81,8 @@ private struct ReminderPreviewRow: View {
     let subtitle: String
     @Binding var isOn: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: CairnSpacing.size3) {
             ZStack {
@@ -84,7 +93,7 @@ private struct ReminderPreviewRow: View {
                     .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(isOn ? Color.cairnAccentInk : Color.cairnTextTertiary)
             }
-            .animation(.easeOut(duration: 0.3), value: isOn)
+            .motionAwareAnimation(.easeOut(duration: 0.3), value: isOn, reduceMotion: reduceMotion)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.cairnLabel.weight(.semibold))
