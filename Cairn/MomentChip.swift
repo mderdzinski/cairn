@@ -16,11 +16,18 @@ enum ChipSize {
 struct MomentChip: View {
     let category: MomentCategory
     let size: ChipSize
+    let isSelected: Bool
     let action: () -> Void
 
-    init(category: MomentCategory, size: ChipSize = .medium, action: @escaping () -> Void) {
+    init(
+        category: MomentCategory,
+        size: ChipSize = .medium,
+        isSelected: Bool = false,
+        action: @escaping () -> Void
+    ) {
         self.category = category
         self.size = size
+        self.isSelected = isSelected
         self.action = action
     }
 
@@ -31,7 +38,7 @@ struct MomentChip: View {
                     category: category,
                     size: size.disc,
                     showsGlyph: true,
-                    filled: false
+                    filled: isSelected
                 )
                 Text(category.displayName)
                     .font(.cairnLabel)
@@ -41,6 +48,7 @@ struct MomentChip: View {
         .buttonStyle(MomentChipButtonStyle())
         .accessibilityLabel(Text(category.displayName))
         .accessibilityHint(Text(category.summary))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

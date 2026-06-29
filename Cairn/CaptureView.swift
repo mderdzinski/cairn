@@ -3,15 +3,8 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-enum CaptureDestination: Hashable {
-    case reminders
-}
-
 struct CaptureView: View {
     let onSeePath: () -> Void
-    let onRoute: (CairnTab) -> Void
-
-    @Binding var path: NavigationPath
 
     @Environment(\.modelContext) private var modelContext
     @Query private var todayMoments: [Moment]
@@ -19,14 +12,8 @@ struct CaptureView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var feedback = UIImpactFeedbackGenerator(style: .medium)
 
-    init(
-        onSeePath: @escaping () -> Void = {},
-        onRoute: @escaping (CairnTab) -> Void = { _ in },
-        path: Binding<NavigationPath> = .constant(NavigationPath())
-    ) {
+    init(onSeePath: @escaping () -> Void = {}) {
         self.onSeePath = onSeePath
-        self.onRoute = onRoute
-        _path = path
         let startOfDay = Calendar.current.startOfDay(for: .now)
         let descriptor = FetchDescriptor<Moment>(
             predicate: #Predicate { $0.timestamp >= startOfDay },
@@ -45,58 +32,38 @@ struct CaptureView: View {
     ]
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ZStack {
-                Color.cairnPaper.ignoresSafeArea()
-                sageBackdrop
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                        .padding(.top, CairnSpacing.size2)
-                    Spacer(minLength: CairnSpacing.size8)
-                    grid
-                    Spacer(minLength: CairnSpacing.size6)
-                    footer
-                }
-                .padding(.horizontal, CairnSpacing.gutter)
-                .padding(.bottom, CairnSpacing.size6)
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            sageBackdrop
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: CairnSpacing.size8)
+                grid
+                Spacer(minLength: CairnSpacing.size6)
+                footer
+            }
+            .padding(.horizontal, CairnSpacing.gutter)
+            .padding(.bottom, CairnSpacing.size6)
 
-                if let category = lastCaptured {
-                    MarkedToast(category: category)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .padding(.bottom, 88)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
+            if let category = lastCaptured {
+                MarkedToast(category: category)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 88)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .navigationDestination(for: CaptureDestination.self) { destination in
-                switch destination {
-                case .reminders: RemindersView(onPreviewTap: onRoute)
-                }
-            }
-            .task { feedback.prepare() }
         }
+        .task { feedback.prepare() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: CairnSpacing.size2) {
-            HStack(alignment: .center) {
-                Text(eyebrowDate)
-                    .font(.cairnEyebrow)
-                    .tracking(CairnTracking.eyebrowCaps)
-                    .foregroundStyle(Color.cairnTextTertiary)
-                    .textCase(.uppercase)
-                Spacer(minLength: 0)
-                Button {
-                    path.append(CaptureDestination.reminders)
-                } label: {
-                    Image(systemName: "bell")
-                        .font(.system(size: 17, weight: .regular))
-                        .foregroundStyle(Color.cairnTextSecondary)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Reminders"))
-            }
+            Text(eyebrowDate)
+                .font(.cairnEyebrow)
+                .tracking(CairnTracking.eyebrowCaps)
+                .foregroundStyle(Color.cairnTextTertiary)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text("What are you\nnoticing?")
                 .font(.cairnDisplay)
                 .tracking(CairnTracking.displayTight)

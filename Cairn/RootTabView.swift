@@ -6,15 +6,16 @@ enum CairnTab: Hashable {
     case capture
     case path
     case patterns
+    case settings
 }
 
 struct RootTabView: View {
     @AppStorage(RemindersSettings.storageKey) private var settingsData: Data = RemindersSettings
         .encode(RemindersSettings())
     @AppStorage("cairn.iCloudFallbackBannerDismissed") private var iCloudBannerDismissed = false
+    @AppStorage("cairn.hasSeenOnboarding") private var hasSeenOnboarding = false
     @Environment(\.openURL) private var openURL
     @State private var selection: CairnTab = .capture
-    @State private var capturePath = NavigationPath()
     let remindersService: RemindersService
     let storeBacking: MomentStoreBacking
 
@@ -39,6 +40,10 @@ struct RootTabView: View {
         }
         .tint(.cairnAccent)
         .environment(remindersService)
+        .fullScreenCover(isPresented: .constant(!hasSeenOnboarding)) {
+            OnboardingView()
+                .environment(remindersService)
+        }
         .task {
             // Capture a launch-time deep link (delivered before view body ran)
             if let url = remindersService.lastDeepLinkURL {
@@ -60,15 +65,11 @@ struct RootTabView: View {
 
     private var tabs: some View {
         TabView(selection: $selection) {
-            CaptureView(
-                onSeePath: { route(to: .path) },
-                onRoute: route(to:),
-                path: $capturePath
-            )
-            .tabItem {
-                Label("Capture", systemImage: "plus")
-            }
-            .tag(CairnTab.capture)
+            CaptureView(onSeePath: { route(to: .path) })
+                .tabItem {
+                    Label("Capture", systemImage: "plus")
+                }
+                .tag(CairnTab.capture)
 
             TimelineView()
                 .tabItem {
@@ -81,6 +82,12 @@ struct RootTabView: View {
                     Label("Patterns", systemImage: "chart.bar")
                 }
                 .tag(CairnTab.patterns)
+
+            SettingsView(onRoute: route(to:))
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .tag(CairnTab.settings)
         }
     }
 
@@ -139,8 +146,6 @@ struct RootTabView: View {
 
     private func route(to tab: CairnTab) {
         selection = tab
-        // External routes should land on the tab root, not deep inside it.
-        capturePath = NavigationPath()
     }
 }
 
