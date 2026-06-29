@@ -58,18 +58,25 @@ final class SyncStatusMonitor {
     private func handle(_ note: Notification) {
         let key = NSPersistentCloudKitContainer.eventNotificationUserInfoKey
         guard let event = note.userInfo?[key] as? NSPersistentCloudKitContainer.Event else { return }
-        // Setup fires once per launch and doesn't reflect actual sync activity.
+
+        // Failures escape every other filter — a failed setup event is the first signal
+        // CloudKit sync can't run after the container was created, and the user needs
+        // to see it.
+        if let error = event.error {
+            logger.error("CloudKit \(String(describing: event.type)) failed: \(error.localizedDescription)")
+            status = .failed(since: event.endDate ?? .now)
+            return
+        }
+        // Successful setup events fire once per launch regardless of real sync
+        // activity. Successful in-flight setup would also mislead users into
+        // thinking a fresh capture is uploading when really the container is
+        // just booting. Suppress both.
         guard event.type != .setup else { return }
 
         if event.endDate == nil {
             status = .syncing
             return
         }
-        if let error = event.error {
-            logger.error("CloudKit \(String(describing: event.type)) failed: \(error.localizedDescription)")
-            status = .failed(since: event.endDate ?? .now)
-        } else {
-            status = .synced(since: event.endDate ?? .now)
-        }
+        status = .synced(since: event.endDate ?? .now)
     }
 }
