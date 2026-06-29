@@ -29,6 +29,7 @@ struct TimelineView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     SyncStatusPip(status: syncMonitor.status)
+                        .allowsHitTesting(false)
                 }
             }
             .sheet(item: $reflectingMoment) { moment in
