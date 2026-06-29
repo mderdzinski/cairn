@@ -40,6 +40,7 @@ struct CairnApp: App {
                 remindersService: appDelegate.remindersService,
                 storeBacking: storeResult.backing
             )
+            .preferredColorScheme(.light)
         }
         .modelContainer(storeResult.container)
     }

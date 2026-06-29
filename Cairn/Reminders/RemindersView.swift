@@ -42,6 +42,9 @@ struct RemindersView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CairnSpacing.size4) {
                     intro
+                    if remindersService.currentAuthorizationStatus == .denied {
+                        permissionDeniedBanner
+                    }
                     if remindersService.lastScheduleFailure != nil {
                         scheduleFailureBanner
                     }
@@ -166,6 +169,37 @@ struct RemindersView: View {
             .foregroundStyle(Color.cairnTextSecondary)
             .lineSpacing(2)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var permissionDeniedBanner: some View {
+        HStack(alignment: .top, spacing: CairnSpacing.size2) {
+            Image(systemName: "bell.slash")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.cairnStone600)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: CairnSpacing.size1) {
+                Text("Notifications are off in iOS Settings")
+                    .font(.cairnLabel.weight(.semibold))
+                    .foregroundStyle(Color.cairnTextPrimary)
+                Text("Cairn can't send reminders until notifications are allowed in iOS Settings.")
+                    .font(.cairnLabel)
+                    .foregroundStyle(Color.cairnTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                .font(.cairnLabel.weight(.medium))
+                .foregroundStyle(Color.cairnAccentInk)
+                .padding(.top, CairnSpacing.size1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, CairnSpacing.size3)
+        .padding(.horizontal, CairnSpacing.size3)
+        .background(Color.cairnStone100)
+        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.medium))
     }
 
     private var scheduleFailureBanner: some View {

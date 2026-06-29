@@ -21,6 +21,10 @@ final class RemindersService: NSObject {
     /// Non-nil when the most recent ``reschedule(settings:now:)`` call had at least one
     /// notification request fail to register. Cleared by the next successful call.
     var lastScheduleFailure: ScheduleFailure?
+    /// The last known iOS notification authorization status. Updated by
+    /// ``refreshAuthorizationStatus()``; views observe this to surface a "permission
+    /// revoked in Settings" affordance without polling.
+    var currentAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     func requestAuthorization() async -> Bool {
         do {
@@ -32,6 +36,13 @@ final class RemindersService: NSObject {
 
     func authorizationStatus() async -> UNAuthorizationStatus {
         await center.notificationSettings().authorizationStatus
+    }
+
+    /// Re-query the system for the current notification authorization and publish the
+    /// result on ``currentAuthorizationStatus``. Safe to call from any scenePhase
+    /// transition; never triggers the system permission prompt.
+    func refreshAuthorizationStatus() async {
+        currentAuthorizationStatus = await authorizationStatus()
     }
 
     func reschedule(settings: RemindersSettings, now: Date = .now) async {

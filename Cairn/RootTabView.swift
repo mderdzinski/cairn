@@ -15,6 +15,7 @@ struct RootTabView: View {
     @AppStorage("cairn.iCloudFallbackBannerDismissed") private var iCloudBannerDismissed = false
     @AppStorage("cairn.hasSeenOnboarding") private var hasSeenOnboarding = false
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection: CairnTab = .capture
     let remindersService: RemindersService
     let storeBacking: MomentStoreBacking
@@ -50,6 +51,7 @@ struct RootTabView: View {
                 route(url: url)
                 remindersService.lastDeepLinkURL = nil
             }
+            await reconcileNotificationPermission()
             let settings = RemindersSettings.decode(settingsData)
             if settings.anyEnabled {
                 await remindersService.reschedule(settings: settings)
@@ -60,7 +62,25 @@ struct RootTabView: View {
             route(url: url)
             remindersService.lastDeepLinkURL = nil
         }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await reconcileNotificationPermission() }
+        }
         .onOpenURL(perform: route(url:))
+    }
+
+    /// On every foreground transition, re-check iOS notification permission. If the
+    /// user revoked it in Settings while reminders were enabled, flip the toggles off
+    /// and cancel any pending requests so the UI matches reality.
+    private func reconcileNotificationPermission() async {
+        await remindersService.refreshAuthorizationStatus()
+        guard remindersService.currentAuthorizationStatus == .denied else { return }
+        var settings = RemindersSettings.decode(settingsData)
+        guard settings.anyEnabled else { return }
+        settings.noticeEnabled = false
+        settings.reflectEnabled = false
+        settingsData = RemindersSettings.encode(settings)
+        await remindersService.cancelAll()
     }
 
     private var tabs: some View {
