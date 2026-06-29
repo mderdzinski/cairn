@@ -4,6 +4,7 @@ import SwiftUI
 
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncStatusMonitor.self) private var syncMonitor
     @Query(sort: \Moment.timestamp, order: .reverse)
     private var moments: [Moment]
     @State private var reflectingMoment: Moment?
@@ -59,11 +60,14 @@ struct TimelineView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: CairnSpacing.size1) {
-                Text("Your path")
-                    .font(.cairnEyebrow)
-                    .tracking(CairnTracking.eyebrowCaps)
-                    .foregroundStyle(Color.cairnTextTertiary)
-                    .textCase(.uppercase)
+                HStack(spacing: CairnSpacing.size2) {
+                    Text("Your path")
+                        .font(.cairnEyebrow)
+                        .tracking(CairnTracking.eyebrowCaps)
+                        .foregroundStyle(Color.cairnTextTertiary)
+                        .textCase(.uppercase)
+                    SyncStatusPip(status: syncMonitor.status)
+                }
                 Text("\(moments.count) \(moments.count == 1 ? "moment" : "moments")")
                     .font(.cairnSerif(size: 28, weight: .light))
                     .foregroundStyle(Color.cairnTextPrimary)
@@ -162,4 +166,5 @@ struct TimelineView: View {
 #Preview {
     TimelineView()
         .modelContainer(for: Moment.self, inMemory: true)
+        .environment(SyncStatusMonitor(backing: .inMemory))
 }

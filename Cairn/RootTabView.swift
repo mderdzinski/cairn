@@ -172,9 +172,11 @@ struct RootTabView: View {
 #Preview("Default") {
     RootTabView(remindersService: RemindersService())
         .modelContainer(for: Moment.self, inMemory: true)
+        .environment(SyncStatusMonitor(backing: .inMemory))
 }
 
 #Preview("iCloud unavailable") {
     RootTabView(remindersService: RemindersService(), storeBacking: .local)
         .modelContainer(for: Moment.self, inMemory: true)
+        .environment(SyncStatusMonitor(backing: .local))
 }

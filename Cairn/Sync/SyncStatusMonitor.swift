@@ -1,0 +1,75 @@
+import CairnCore
+import CoreData
+import Foundation
+import os
+import SwiftUI
+
+/// What `SyncStatusMonitor` exposes to views. The state is intentionally minimal —
+/// the UI only needs to know which glyph to render and what timestamp (if any) to show.
+enum SyncStatus: Equatable {
+    /// Sync was never attempted — the app fell back to a local-only store. The Path
+    /// header should hide the pip entirely; the iCloud-fallback banner already covers
+    /// this case at the top of every tab.
+    case disabled
+    /// Nothing observed yet this session (cold launch, before any CloudKit event fires).
+    case idle
+    /// A sync event is in flight.
+    case syncing
+    /// The most recent sync event finished successfully at the given time.
+    case synced(since: Date)
+    /// The most recent sync event ended with an error.
+    case failed(since: Date)
+}
+
+/// Subscribes to `NSPersistentCloudKitContainer.eventChangedNotification` and tracks the
+/// most recent import / export event so the UI can surface "synced N min ago" without
+/// polling. Setup events are ignored — they fire once per launch regardless of whether
+/// anything user-meaningful synced, so they make a noisy signal.
+@MainActor
+@Observable
+final class SyncStatusMonitor {
+    private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Sync")
+    private(set) var status: SyncStatus
+    private var observerTask: Task<Void, Never>?
+
+    init(backing: MomentStoreBacking) {
+        switch backing {
+        case .cloud:
+            status = .idle
+        case .local, .inMemory:
+            status = .disabled
+        }
+        guard backing == .cloud else { return }
+        startObserving()
+    }
+
+    private func startObserving() {
+        observerTask = Task { [weak self] in
+            let stream = NotificationCenter.default.notifications(
+                named: NSPersistentCloudKitContainer.eventChangedNotification
+            )
+            for await note in stream {
+                guard let self else { return }
+                await handle(note)
+            }
+        }
+    }
+
+    private func handle(_ note: Notification) {
+        let key = NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+        guard let event = note.userInfo?[key] as? NSPersistentCloudKitContainer.Event else { return }
+        // Setup fires once per launch and doesn't reflect actual sync activity.
+        guard event.type != .setup else { return }
+
+        if event.endDate == nil {
+            status = .syncing
+            return
+        }
+        if let error = event.error {
+            logger.error("CloudKit \(String(describing: event.type)) failed: \(error.localizedDescription)")
+            status = .failed(since: event.endDate ?? .now)
+        } else {
+            status = .synced(since: event.endDate ?? .now)
+        }
+    }
+}
