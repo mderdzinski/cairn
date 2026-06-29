@@ -7,6 +7,9 @@ struct ReminderCardHead: View {
     let subtitle: String
     @Binding var isOn: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var avatarSize: CGFloat = 38
+
     var body: some View {
         HStack(spacing: CairnSpacing.size3) {
             avatar
@@ -32,7 +35,7 @@ struct ReminderCardHead: View {
                 .font(.system(size: 17, weight: .regular))
                 .foregroundStyle(isOn ? Color.cairnAccentInk : Color.cairnTextTertiary)
         }
-        .frame(width: 38, height: 38)
-        .animation(.easeOut(duration: 0.18), value: isOn)
+        .frame(width: avatarSize, height: avatarSize)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: isOn, reduceMotion: reduceMotion)
     }
 }

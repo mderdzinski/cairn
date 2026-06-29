@@ -30,15 +30,36 @@ public extension Font {
     }
 
     static func cairnSerif(size: CGFloat, weight: Font.Weight) -> Font {
-        .custom(spectralPostScriptName(for: weight), size: size)
+        .custom(spectralPostScriptName(for: weight), size: size, relativeTo: textStyle(forSize: size))
     }
 
     static func cairnSans(size: CGFloat, weight: Font.Weight) -> Font {
-        .custom("HankenGrotesk-Regular", size: size).weight(weight)
+        .custom("HankenGrotesk-Regular", size: size, relativeTo: textStyle(forSize: size))
+            .weight(weight)
     }
 
     static func cairnMono(size: CGFloat, weight: Font.Weight) -> Font {
-        .custom("SplineSansMono-Regular", size: size).weight(weight)
+        .custom("SplineSansMono-Regular", size: size, relativeTo: textStyle(forSize: size))
+            .weight(weight)
+    }
+
+    /// Map a design pixel size to its nearest Apple text style so `Font.custom(_:size:relativeTo:)`
+    /// scales the custom face the same way `Font.title`/`Font.body` would scale. Anchors fall
+    /// roughly on Apple's HIG defaults: caption2 11, caption 12, footnote 13, subheadline 15,
+    /// callout 16, body 17, headline 17, title3 20, title2 22, title 28, largeTitle 34+.
+    private static func textStyle(forSize size: CGFloat) -> Font.TextStyle {
+        switch size {
+        case ..<12: .caption2
+        case ..<13: .caption
+        case ..<15: .footnote
+        case ..<16: .subheadline
+        case ..<17: .callout
+        case ..<20: .body
+        case ..<22: .title3
+        case ..<28: .title2
+        case ..<34: .title
+        default: .largeTitle
+        }
     }
 }
 

@@ -6,6 +6,8 @@ struct InlineTimeRow: View {
     @Binding var minutes: Int
     @Binding var isExpanded: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var date: Binding<Date> {
         Binding(
             get: { Self.date(from: minutes) },
@@ -16,7 +18,7 @@ struct InlineTimeRow: View {
     var body: some View {
         VStack(spacing: 0) {
             Button {
-                withAnimation(.easeOut(duration: 0.18)) {
+                MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.18)) {
                     isExpanded.toggle()
                 }
             } label: {
@@ -32,6 +34,7 @@ struct InlineTimeRow: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.cairnTextTertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .accessibilityHidden(true)
                 }
                 .padding(.vertical, CairnSpacing.size3)
                 .contentShape(Rectangle())
@@ -44,7 +47,10 @@ struct InlineTimeRow: View {
                     .labelsHidden()
                     .frame(maxWidth: .infinity)
                     .colorScheme(.light)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .motionAwareTransition(
+                        .opacity.combined(with: .move(edge: .top)),
+                        reduceMotion: reduceMotion
+                    )
             }
         }
     }

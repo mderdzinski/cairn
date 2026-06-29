@@ -30,6 +30,10 @@ private struct BreakdownRow: View {
     let total: CategoryTotal
     let maxCount: Int
 
+    @ScaledMetric(relativeTo: .footnote) private var labelWidth: CGFloat = 96
+    @ScaledMetric(relativeTo: .footnote) private var countWidth: CGFloat = 24
+    @ScaledMetric(relativeTo: .footnote) private var barHeight: CGFloat = 8
+
     private var ratio: CGFloat {
         CGFloat(total.count) / CGFloat(maxCount)
     }
@@ -41,7 +45,9 @@ private struct BreakdownRow: View {
             Text(total.category.displayName)
                 .font(.cairnLabel.weight(.semibold))
                 .foregroundStyle(Color.cairnTextPrimary)
-                .frame(width: 96, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: labelWidth, alignment: .leading)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -51,14 +57,20 @@ private struct BreakdownRow: View {
                         .frame(width: max(6, geo.size.width * ratio))
                 }
             }
-            .frame(height: 8)
+            .frame(height: barHeight)
+            .accessibilityHidden(true)
 
             Text("\(total.count)")
                 .font(.cairnMono)
                 .monospacedDigit()
                 .foregroundStyle(Color.cairnTextSecondary)
-                .frame(width: 24, alignment: .trailing)
+                .lineLimit(1)
+                .frame(width: countWidth, alignment: .trailing)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(total.category.displayName): \(total.count) \(total.count == 1 ? "moment" : "moments")"
+        )
     }
 }
 

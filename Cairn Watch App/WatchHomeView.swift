@@ -23,6 +23,7 @@ struct WatchHomeView: View {
                     Capsule()
                         .fill(Color.cairnBorderStrong.opacity(0.7))
                         .frame(width: 34, height: 5)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(spacing: 2) {
@@ -44,6 +45,10 @@ struct WatchHomeView: View {
         }
         .buttonStyle(.plain)
         .background(Color.cairnPaper)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("Mark a moment"))
+        .accessibilityValue(Text(stoneCountLine))
+        .accessibilityHint(Text("Opens the capture screen"))
     }
 
     private var eyebrowDate: String {

@@ -11,6 +11,7 @@ enum WatchScreen: Equatable {
 
 struct WatchRootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var todayMoments: [Moment]
     @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
@@ -33,25 +34,31 @@ struct WatchRootView: View {
             switch screen {
             case .home:
                 WatchHomeView(todayCount: todaysMomentCount) {
-                    withAnimation(.easeInOut(duration: 0.2)) { screen = .capture }
+                    MotionGate.animate(reduceMotion: reduceMotion, .easeInOut(duration: 0.2)) {
+                        screen = .capture
+                    }
                 }
             case .capture:
                 WatchCaptureView(
                     onCapture: handleCapture,
-                    onClose: { withAnimation { screen = .home } }
+                    onClose: {
+                        MotionGate.animate(reduceMotion: reduceMotion, .default) {
+                            screen = .home
+                        }
+                    }
                 )
             case .confirm(let category):
                 WatchConfirmView(category: category)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: screen)
+        .motionAwareAnimation(.easeInOut(duration: 0.25), value: screen, reduceMotion: reduceMotion)
         .onOpenURL(perform: handleDeepLink)
     }
 
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "cairn", url.host == "capture" else { return }
         dismissTask?.cancel()
-        withAnimation(.easeInOut(duration: 0.2)) {
+        MotionGate.animate(reduceMotion: reduceMotion, .easeInOut(duration: 0.2)) {
             screen = .capture
         }
     }
@@ -59,12 +66,16 @@ struct WatchRootView: View {
     private func handleCapture(_ category: MomentCategory) {
         WKInterfaceDevice.current().play(.click)
         modelContext.insert(Moment(category: category))
-        withAnimation { screen = .confirm(category) }
+        MotionGate.animate(reduceMotion: reduceMotion, .default) {
+            screen = .confirm(category)
+        }
         dismissTask?.cancel()
         dismissTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled else { return }
-            withAnimation { screen = .home }
+            MotionGate.animate(reduceMotion: reduceMotion, .default) {
+                screen = .home
+            }
         }
     }
 }

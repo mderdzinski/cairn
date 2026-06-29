@@ -7,6 +7,7 @@ struct CaptureView: View {
     let onSeePath: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var todayMoments: [Moment]
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
@@ -50,7 +51,10 @@ struct CaptureView: View {
                 MarkedToast(category: category)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 88)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .motionAwareTransition(
+                        .opacity.combined(with: .move(edge: .bottom)),
+                        reduceMotion: reduceMotion
+                    )
             }
         }
         .task { feedback.prepare() }
@@ -100,6 +104,7 @@ struct CaptureView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.cairnTextTertiary)
+                    .accessibilityHidden(true)
             }
             .padding(.vertical, CairnSpacing.size3)
             .padding(.horizontal, CairnSpacing.size4)
@@ -147,13 +152,13 @@ struct CaptureView: View {
         modelContext.insert(Moment(category: category))
 
         toastTask?.cancel()
-        withAnimation(.easeOut(duration: 0.18)) {
+        MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.18)) {
             lastCaptured = category
         }
         toastTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1300))
             if !Task.isCancelled {
-                withAnimation(.easeIn(duration: 0.22)) {
+                MotionGate.animate(reduceMotion: reduceMotion, .easeIn(duration: 0.22)) {
                     lastCaptured = nil
                 }
             }

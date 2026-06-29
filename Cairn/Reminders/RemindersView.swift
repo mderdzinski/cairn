@@ -20,6 +20,7 @@ struct RemindersView: View {
         .encode(RemindersSettings())
     @Environment(RemindersService.self) private var remindersService
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expandedRow: ExpandedRow?
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
@@ -177,6 +178,7 @@ struct RemindersView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.cairnStone600)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: CairnSpacing.size1) {
                 Text("Notifications are off in iOS Settings")
                     .font(.cairnLabel.weight(.semibold))
@@ -208,6 +210,7 @@ struct RemindersView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.cairnStone600)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: CairnSpacing.size1) {
                 Text("Reminders couldn't be scheduled")
                     .font(.cairnLabel.weight(.semibold))
@@ -373,7 +376,7 @@ struct RemindersView: View {
         Binding(
             get: { expandedRow == row },
             set: { isOpen in
-                withAnimation(.easeOut(duration: 0.18)) {
+                MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.18)) {
                     expandedRow = isOpen ? row : nil
                 }
             }

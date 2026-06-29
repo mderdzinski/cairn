@@ -54,5 +54,6 @@ struct PrimingSheet: View {
         }
         .frame(width: 60, height: 60)
         .padding(.top, CairnSpacing.size3)
+        .accessibilityHidden(true)
     }
 }

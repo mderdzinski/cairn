@@ -29,6 +29,7 @@ struct NotifPreview: View {
                 Image(systemName: "arrow.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.cairnTextTertiary)
+                    .accessibilityHidden(true)
             }
             .padding(.vertical, CairnSpacing.size2)
             .padding(.horizontal, CairnSpacing.size3)
@@ -41,6 +42,8 @@ struct NotifPreview: View {
             .shadow(color: Color.cairnStone900.opacity(0.06), radius: 3, x: 0, y: 1)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text("Sample notification"))
+        .accessibilityValue(Text(bodyText))
     }
 
     private var glyph: some View {
@@ -59,5 +62,6 @@ struct NotifPreview: View {
                 .foregroundStyle(Color.cairnStone600)
         }
         .frame(width: 30, height: 30)
+        .accessibilityHidden(true)
     }
 }
