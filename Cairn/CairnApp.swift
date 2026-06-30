@@ -25,13 +25,16 @@ struct CairnApp: App {
     @State private var syncMonitor: SyncStatusMonitor
 
     init() {
+        CairnApp.applyUITestLaunchArgumentsIfPresent()
         CairnApp.migrateOnboardingFlagForUpgradedInstalls()
         let isUnderXCTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let isUITestRun = CommandLine.arguments.contains("-cairn.uitest.reset")
+            || CommandLine.arguments.contains("-cairn.uitest.seedOnboardingSeen")
         let result: MomentStoreResult
         do {
             result = try MomentStore.makeContainer(
                 cloudKitContainerID: "iCloud.com.markderdzinski.Cairn",
-                inMemory: isUnderXCTest
+                inMemory: isUnderXCTest || isUITestRun
             )
         } catch {
             // Both CloudKit and local persistence failed — genuinely unrecoverable.
@@ -39,6 +42,23 @@ struct CairnApp: App {
         }
         storeResult = result
         _syncMonitor = State(wrappedValue: SyncStatusMonitor(backing: result.backing))
+    }
+
+    /// Test launch arguments — recognized only when present, no-op in normal runs.
+    /// `-cairn.uitest.reset` wipes user defaults so the next launch behaves like a
+    /// fresh install (onboarding will show). `-cairn.uitest.seedOnboardingSeen`
+    /// pre-marks onboarding as already seen so a test can skip straight to Capture.
+    private static func applyUITestLaunchArgumentsIfPresent() {
+        let args = CommandLine.arguments
+        let defaults = UserDefaults.standard
+        if args.contains("-cairn.uitest.reset") {
+            defaults.removeObject(forKey: "cairn.hasSeenOnboarding")
+            defaults.removeObject(forKey: "cairn.iCloudFallbackBannerDismissed")
+            defaults.removeObject(forKey: RemindersSettings.storageKey)
+        }
+        if args.contains("-cairn.uitest.seedOnboardingSeen") {
+            defaults.set(true, forKey: "cairn.hasSeenOnboarding")
+        }
     }
 
     /// Pre-render migration so users who already configured reminders on a prior
