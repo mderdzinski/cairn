@@ -104,7 +104,7 @@ struct TimelineView: View {
                         TimelineEntry(moment: moment) {
                             reflectingMoment = moment
                         }
-                        .listRowBackground(Color.cairnSurfaceCard)
+                        .listRowBackground(swipeRowBackground)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 delete(moment)
@@ -124,6 +124,20 @@ struct TimelineView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+    }
+
+    /// Row background with rounded trailing corners so the row sits neatly next to
+    /// the trash button when swipe-to-delete reveals it. The inset-grouped section
+    /// already clips the leading side to its rounded card outline; matching the
+    /// trailing side here keeps the shape coherent across the swipe reveal.
+    private var swipeRowBackground: some View {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: CairnRadii.medium,
+            topTrailingRadius: CairnRadii.medium
+        )
+        .fill(Color.cairnSurfaceCard)
     }
 
     private var emptyState: some View {
