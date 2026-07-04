@@ -53,9 +53,9 @@ struct TimelineView: View {
             }
             .onAppear {
                 // Fires on first appear and every tab switch back to Path. Refetches
-                // the initial 30-day window (so captures made on other tabs / the
-                // watch show up) and merges with anything older we've paged in — so
-                // scroll position is preserved across tab switches.
+                // the newest page (so captures made on other tabs / the watch show up)
+                // and merges with anything older we've paged in — so scroll position
+                // is preserved across tab switches.
                 Task { await refreshInitialWindow() }
             }
         }
