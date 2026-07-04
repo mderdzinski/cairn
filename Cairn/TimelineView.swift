@@ -5,8 +5,24 @@ import SwiftUI
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncStatusMonitor.self) private var syncMonitor
-    @Query(sort: \Moment.timestamp, order: .reverse)
-    private var moments: [Moment]
+
+    @State private var moments: [Moment] = []
+    /// Trailing cutoff of what we've loaded — anything with `timestamp >= oldestLoaded`
+    /// is either already in `moments` or was fetched and returned empty. Starts at
+    /// 30 days before now.
+    @State private var oldestLoaded: Date = Calendar.current.date(
+        byAdding: .day, value: -30, to: .now
+    ) ?? .now
+    /// Flips true when a page-in returns zero rows — stops the sentinel from firing
+    /// further loads and swaps in the "start of your path" caption.
+    @State private var hasReachedStart = false
+    /// Guards concurrent load attempts on rapid scroll or overlapping onAppear firings.
+    @State private var isLoading = false
+    /// Cheap all-time count via fetchCount. Drives the "no moments at all" empty state.
+    @State private var totalStoreCount = 0
+    /// Cheap trailing-7-day count via fetchCount. Drives the headline copy.
+    @State private var pastWeekCount = 0
+
     @State private var reflectingMoment: Moment?
 
     private var unreflectedCount: Int {
@@ -39,12 +55,19 @@ struct TimelineView: View {
                     onDelete: { delete(moment) }
                 )
             }
+            .onAppear {
+                // Fires on first appear and every tab switch back to Path. Refetches
+                // the initial 30-day window (so captures made on other tabs / the
+                // watch show up) and merges with anything older we've paged in — so
+                // scroll position is preserved across tab switches.
+                Task { await refreshInitialWindow() }
+            }
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        if moments.isEmpty {
+        if totalStoreCount == 0 {
             emptyState
         } else {
             VStack(alignment: .leading, spacing: 0) {
@@ -69,14 +92,19 @@ struct TimelineView: View {
                     .tracking(CairnTracking.eyebrowCaps)
                     .foregroundStyle(Color.cairnTextTertiary)
                     .textCase(.uppercase)
-                Text("\(moments.count) \(moments.count == 1 ? "moment" : "moments")")
+                Text(headlineText)
                     .font(.cairnSerif(size: 28, weight: .light))
                     .foregroundStyle(Color.cairnTextPrimary)
             }
             Spacer(minLength: 0)
-            StoneStack(count: min(max(moments.count, 1), 6), size: .small)
+            StoneStack(count: min(max(pastWeekCount, 1), 6), size: .small)
                 .alignmentGuide(.firstTextBaseline) { dim in dim[VerticalAlignment.center] }
         }
+    }
+
+    private var headlineText: String {
+        let noun = pastWeekCount == 1 ? "moment" : "moments"
+        return "\(pastWeekCount) \(noun) this week"
     }
 
     private var unreflectedBanner: some View {
@@ -121,9 +149,41 @@ struct TimelineView: View {
                         .textCase(.uppercase)
                 }
             }
+            tailSentinel
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private var tailSentinel: some View {
+        if hasReachedStart {
+            Section {
+                Text("You've reached the start of your path.")
+                    .font(.cairnLabel)
+                    .foregroundStyle(Color.cairnTextTertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .padding(.vertical, CairnSpacing.size4)
+            }
+        } else {
+            Section {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Color.cairnTextTertiary)
+                    Spacer()
+                }
+                .padding(.vertical, CairnSpacing.size3)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .onAppear {
+                    Task { await loadNextMonth() }
+                }
+            }
+        }
     }
 
     /// Row background with rounded trailing corners so the row sits neatly next to
@@ -172,11 +232,74 @@ struct TimelineView: View {
         return day.formatted(date: .abbreviated, time: .omitted)
     }
 
+    // MARK: - Data loading
+
+    /// The trailing cutoff of the initial fetch — anything with `timestamp >=` this
+    /// point is inside the first 30-day window.
+    private var initialCutoff: Date {
+        Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+    }
+
+    /// Fires on first appear and every tab switch back to Path. Refetches the initial
+    /// 30-day window and merges with anything older we've already paged in, so a
+    /// capture made on another tab shows up here without scrapping paginated scroll
+    /// position. Dedupes by id to guard against the case where `initialCutoff` has
+    /// crept forward past what we originally paged (e.g. the view stayed alive across
+    /// a day boundary).
+    private func refreshInitialWindow() async {
+        refreshCounts()
+        guard !isLoading else { return }
+        let cutoff = initialCutoff
+        let descriptor = MomentTimelineFetcher.pageDescriptor(from: cutoff, until: .now)
+        let fresh = (try? modelContext.fetch(descriptor)) ?? []
+        let freshIDs = Set(fresh.map(\.id))
+        let older = moments.filter { $0.timestamp < cutoff && !freshIDs.contains($0.id) }
+        moments = fresh + older
+    }
+
+    /// Called by the tail sentinel. Advances `oldestLoaded` one month further back
+    /// and appends what fell in that window. If nothing did, marks `hasReachedStart`
+    /// so we stop firing.
+    private func loadNextMonth() async {
+        guard !isLoading, !hasReachedStart else { return }
+        let currentOldest = oldestLoaded
+        let nextOldest = Calendar.current.date(
+            byAdding: .month, value: -1, to: currentOldest
+        ) ?? currentOldest
+        await loadWindow(from: nextOldest, until: currentOldest)
+        oldestLoaded = nextOldest
+    }
+
+    /// Fetch and append moments in `[from, until)`. Sets `hasReachedStart` when the
+    /// page-in returns nothing — the sentinel swaps to the "start of your path"
+    /// caption on the next render.
+    private func loadWindow(from: Date, until: Date) async {
+        isLoading = true
+        defer { isLoading = false }
+        let descriptor = MomentTimelineFetcher.pageDescriptor(from: from, until: until)
+        let fetched = (try? modelContext.fetch(descriptor)) ?? []
+        if fetched.isEmpty {
+            hasReachedStart = true
+        } else {
+            moments.append(contentsOf: fetched)
+        }
+    }
+
+    /// Runs the two cheap fetch-count queries used by the header and empty state.
+    private func refreshCounts() {
+        totalStoreCount = (try? modelContext.fetchCount(FetchDescriptor<Moment>())) ?? 0
+        pastWeekCount = (try? modelContext.fetchCount(
+            MomentTimelineFetcher.pastWeekCountDescriptor()
+        )) ?? 0
+    }
+
     private func delete(_ moment: Moment) {
         if reflectingMoment?.id == moment.id {
             reflectingMoment = nil
         }
         modelContext.delete(moment)
+        moments.removeAll { $0.id == moment.id }
+        refreshCounts()
     }
 }
 
