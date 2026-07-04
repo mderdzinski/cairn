@@ -32,4 +32,10 @@ struct MomentTimelineFetcherTests {
         #expect(descriptor.fetchLimit == MomentTimelineFetcher.defaultPageSize)
         #expect(MomentTimelineFetcher.defaultPageSize == 50)
     }
+
+    @Test("unreflectedCountDescriptor has no fetch limit — it counts the whole store")
+    func unreflectedCountDescriptorNoLimit() {
+        let descriptor = MomentTimelineFetcher.unreflectedCountDescriptor()
+        #expect(descriptor.fetchLimit == nil)
+    }
 }

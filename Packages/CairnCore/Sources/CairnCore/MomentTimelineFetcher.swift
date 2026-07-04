@@ -15,16 +15,21 @@ public enum MomentTimelineFetcher {
     /// "load more history" scrolling.
     public static let defaultPageSize = 50
 
-    /// Fetch the `limit` most recent moments strictly older than `cursor`, newest
-    /// first. Caller uses `moments.last?.timestamp` as the cursor for the next page.
+    /// Fetch the `limit` most recent moments at or before `cursor`, newest first.
+    /// Caller uses `moments.last?.timestamp` as the cursor for the next page and
+    /// **must dedupe by id** because the predicate is inclusive on the boundary:
+    /// two moments sharing the cursor timestamp would otherwise slip through the
+    /// crack of a strict `<` cursor. In the common no-tie case, the overlap is at
+    /// most one row.
+    ///
     /// When the returned array has fewer than `limit` elements, there are no more
-    /// moments in the store older than the cursor.
+    /// moments in the store at or before the cursor.
     public static func descriptorBefore(
         _ cursor: Date,
         limit: Int = defaultPageSize
     ) -> FetchDescriptor<Moment> {
         var descriptor = FetchDescriptor<Moment>(
-            predicate: #Predicate { $0.timestamp < cursor },
+            predicate: #Predicate { $0.timestamp <= cursor },
             sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
         )
         descriptor.fetchLimit = limit
@@ -38,6 +43,24 @@ public enum MomentTimelineFetcher {
         let cutoff = pastWeekCutoff(now: now)
         return FetchDescriptor<Moment>(
             predicate: #Predicate { $0.timestamp >= cutoff }
+        )
+    }
+
+    /// Descriptor that counts moments with no reflection. Passed to
+    /// `modelContext.fetchCount(_:)` so the "N moments waiting for reflection"
+    /// banner reflects the entire store, not just what's paginated into memory —
+    /// otherwise a user with older unreflected moments would see an undercount
+    /// (or no banner at all) until they scrolled far enough to load them.
+    ///
+    /// `ReflectSheet.save` already trims whitespace-only reflections down to
+    /// `nil` before storing, so the two-arm predicate `reflection == nil ||
+    /// reflection == ""` covers every "not reflected" case.
+    public static func unreflectedCountDescriptor() -> FetchDescriptor<Moment> {
+        FetchDescriptor<Moment>(
+            // SwiftData #Predicate doesn't reliably lower `.isEmpty` on optional
+            // strings, so the two-arm comparison stays.
+            // swiftlint:disable:next empty_string
+            predicate: #Predicate { $0.reflection == nil || $0.reflection == "" }
         )
     }
 

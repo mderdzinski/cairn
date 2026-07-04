@@ -18,12 +18,13 @@ struct TimelineView: View {
     @State private var totalStoreCount = 0
     /// Cheap trailing-7-day count via fetchCount. Drives the headline copy.
     @State private var pastWeekCount = 0
+    /// Cheap all-time count of moments with no reflection via fetchCount. Drives the
+    /// "N moments waiting for reflection" banner — has to be a store-level query
+    /// because filtering the paged slice would undercount a user with older
+    /// unreflected moments below the current scroll position.
+    @State private var unreflectedCount = 0
 
     @State private var reflectingMoment: Moment?
-
-    private var unreflectedCount: Int {
-        moments.lazy.filter { ($0.reflection ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
-    }
 
     var body: some View {
         NavigationStack {
@@ -268,17 +269,27 @@ struct TimelineView: View {
         defer { isLoading = false }
         let descriptor = MomentTimelineFetcher.descriptorBefore(cursor, limit: pageSize)
         let fetched = (try? modelContext.fetch(descriptor)) ?? []
-        moments.append(contentsOf: fetched)
+        // The cursor predicate is inclusive (`<= cursor`) so ties at the boundary
+        // don't fall through the crack of a strict `<`. That means the page overlaps
+        // with what we already have by at least one row in the common case — dedupe
+        // by id before appending. `hasReachedStart` is judged on the *raw* fetch
+        // count so pathological all-tie boundaries still terminate cleanly.
+        let seen = Set(moments.map(\.id))
+        let fresh = fetched.filter { !seen.contains($0.id) }
+        moments.append(contentsOf: fresh)
         if fetched.count < pageSize {
             hasReachedStart = true
         }
     }
 
-    /// Runs the two cheap fetch-count queries used by the header and empty state.
+    /// Runs the cheap fetch-count queries used by the header, banner, and empty state.
     private func refreshCounts() {
         totalStoreCount = (try? modelContext.fetchCount(FetchDescriptor<Moment>())) ?? 0
         pastWeekCount = (try? modelContext.fetchCount(
             MomentTimelineFetcher.pastWeekCountDescriptor()
+        )) ?? 0
+        unreflectedCount = (try? modelContext.fetchCount(
+            MomentTimelineFetcher.unreflectedCountDescriptor()
         )) ?? 0
     }
 
