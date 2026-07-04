@@ -7,14 +7,10 @@ struct TimelineView: View {
     @Environment(SyncStatusMonitor.self) private var syncMonitor
 
     @State private var moments: [Moment] = []
-    /// Trailing cutoff of what we've loaded — anything with `timestamp >= oldestLoaded`
-    /// is either already in `moments` or was fetched and returned empty. Starts at
-    /// 30 days before now.
-    @State private var oldestLoaded: Date = Calendar.current.date(
-        byAdding: .day, value: -30, to: .now
-    ) ?? .now
-    /// Flips true when a page-in returns zero rows — stops the sentinel from firing
-    /// further loads and swaps in the "start of your path" caption.
+    /// Flips true when a page-in returns fewer than the page size — that's the only
+    /// definitive signal SwiftData gives us that there are no older moments in the
+    /// store. Long gaps in capture history don't trigger this: cursor-based paging
+    /// just keeps flowing across them until the fetch genuinely runs dry.
     @State private var hasReachedStart = false
     /// Guards concurrent load attempts on rapid scroll or overlapping onAppear firings.
     @State private var isLoading = false
@@ -180,7 +176,7 @@ struct TimelineView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .onAppear {
-                    Task { await loadNextMonth() }
+                    Task { await loadMore() }
                 }
             }
         }
@@ -234,54 +230,47 @@ struct TimelineView: View {
 
     // MARK: - Data loading
 
-    /// The trailing cutoff of the initial fetch — anything with `timestamp >=` this
-    /// point is inside the first 30-day window.
-    private var initialCutoff: Date {
-        Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+    private var pageSize: Int {
+        MomentTimelineFetcher.defaultPageSize
     }
 
-    /// Fires on first appear and every tab switch back to Path. Refetches the initial
-    /// 30-day window and merges with anything older we've already paged in, so a
-    /// capture made on another tab shows up here without scrapping paginated scroll
-    /// position. Dedupes by id to guard against the case where `initialCutoff` has
-    /// crept forward past what we originally paged (e.g. the view stayed alive across
-    /// a day boundary).
+    /// Fires on first appear and every tab switch back to Path. Refetches the newest
+    /// page (`pageSize` most recent moments) and merges with anything older we've
+    /// already paged in, so a capture made on another tab shows up here without
+    /// scrapping paginated scroll position. Dedupes by id.
     private func refreshInitialWindow() async {
         refreshCounts()
         guard !isLoading else { return }
-        let cutoff = initialCutoff
-        let descriptor = MomentTimelineFetcher.pageDescriptor(from: cutoff, until: .now)
-        let fresh = (try? modelContext.fetch(descriptor)) ?? []
+        let fresh = (try? modelContext.fetch(
+            MomentTimelineFetcher.descriptorBefore(.now, limit: pageSize)
+        )) ?? []
         let freshIDs = Set(fresh.map(\.id))
-        let older = moments.filter { $0.timestamp < cutoff && !freshIDs.contains($0.id) }
+        let older = moments.filter { !freshIDs.contains($0.id) }
         moments = fresh + older
+        // If the newest page came back with fewer than a full page AND nothing older
+        // is paged in, there is no more history to load.
+        hasReachedStart = fresh.count < pageSize && older.isEmpty
     }
 
-    /// Called by the tail sentinel. Advances `oldestLoaded` one month further back
-    /// and appends what fell in that window. If nothing did, marks `hasReachedStart`
-    /// so we stop firing.
-    private func loadNextMonth() async {
+    /// Called by the tail sentinel. Fetches the next page of moments strictly older
+    /// than the current oldest in `moments`. Cursor-based paging is gap-tolerant: a
+    /// user with a long stretch of no captures doesn't get a false "start of your
+    /// path" — the fetch just skips the empty stretch and returns older moments.
+    /// Only marks `hasReachedStart` when a page returns fewer than `pageSize` results,
+    /// which is SwiftData's definitive signal there's nothing more.
+    private func loadMore() async {
         guard !isLoading, !hasReachedStart else { return }
-        let currentOldest = oldestLoaded
-        let nextOldest = Calendar.current.date(
-            byAdding: .month, value: -1, to: currentOldest
-        ) ?? currentOldest
-        await loadWindow(from: nextOldest, until: currentOldest)
-        oldestLoaded = nextOldest
-    }
-
-    /// Fetch and append moments in `[from, until)`. Sets `hasReachedStart` when the
-    /// page-in returns nothing — the sentinel swaps to the "start of your path"
-    /// caption on the next render.
-    private func loadWindow(from: Date, until: Date) async {
+        guard let cursor = moments.last?.timestamp else {
+            // Nothing loaded yet — refreshInitialWindow will handle this via .onAppear.
+            return
+        }
         isLoading = true
         defer { isLoading = false }
-        let descriptor = MomentTimelineFetcher.pageDescriptor(from: from, until: until)
+        let descriptor = MomentTimelineFetcher.descriptorBefore(cursor, limit: pageSize)
         let fetched = (try? modelContext.fetch(descriptor)) ?? []
-        if fetched.isEmpty {
+        moments.append(contentsOf: fetched)
+        if fetched.count < pageSize {
             hasReachedStart = true
-        } else {
-            moments.append(contentsOf: fetched)
         }
     }
 

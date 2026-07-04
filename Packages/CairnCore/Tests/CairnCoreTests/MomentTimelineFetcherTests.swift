@@ -20,10 +20,16 @@ struct MomentTimelineFetcherTests {
         #expect(cutoff == expectedDate)
     }
 
-    @Test("pageDescriptor fetch limit matches the documented ceiling")
-    func pageDescriptorLimit() {
-        let descriptor = MomentTimelineFetcher.pageDescriptor(from: .distantPast, until: .distantFuture)
-        #expect(descriptor.fetchLimit == MomentTimelineFetcher.pageFetchLimit)
-        #expect(MomentTimelineFetcher.pageFetchLimit == 500)
+    @Test("descriptorBefore uses the caller-supplied limit")
+    func descriptorBeforeLimit() {
+        let descriptor = MomentTimelineFetcher.descriptorBefore(.now, limit: 25)
+        #expect(descriptor.fetchLimit == 25)
+    }
+
+    @Test("descriptorBefore defaults to the documented page size")
+    func descriptorBeforeDefaultLimit() {
+        let descriptor = MomentTimelineFetcher.descriptorBefore(.now)
+        #expect(descriptor.fetchLimit == MomentTimelineFetcher.defaultPageSize)
+        #expect(MomentTimelineFetcher.defaultPageSize == 50)
     }
 }

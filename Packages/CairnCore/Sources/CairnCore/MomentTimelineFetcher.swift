@@ -3,20 +3,31 @@ import SwiftData
 
 /// Factories for the paged Path timeline. Keeps predicate + sort + limit shape in one
 /// place so the iOS surface and any future watch history reuse the same fetch shape.
+///
+/// Paging is cursor-based (`timestamp < cursor` with a fixed page size) rather than
+/// window-based. That way a user with a large gap in their capture history — say
+/// nothing between January and July — doesn't hit a false "start of your path" when
+/// the pager sweeps across the empty stretch. Every fetch either returns more moments
+/// or definitively signals the start.
 public enum MomentTimelineFetcher {
-    /// Safety valve against a single window with pathological volume. Real users won't
-    /// hit this; a compromised install or a bad import might.
-    public static let pageFetchLimit = 500
+    /// Default page size for cursor-based fetches. Sized so an active user sees
+    /// several days per page and a light user sees weeks; both feel like normal
+    /// "load more history" scrolling.
+    public static let defaultPageSize = 50
 
-    /// Fetch moments with `from <= timestamp < until`, newest first, up to `pageFetchLimit`.
-    /// The half-open range is important — chained pages should butt up against each other
-    /// without duplicating boundary moments.
-    public static func pageDescriptor(from: Date, until: Date) -> FetchDescriptor<Moment> {
+    /// Fetch the `limit` most recent moments strictly older than `cursor`, newest
+    /// first. Caller uses `moments.last?.timestamp` as the cursor for the next page.
+    /// When the returned array has fewer than `limit` elements, there are no more
+    /// moments in the store older than the cursor.
+    public static func descriptorBefore(
+        _ cursor: Date,
+        limit: Int = defaultPageSize
+    ) -> FetchDescriptor<Moment> {
         var descriptor = FetchDescriptor<Moment>(
-            predicate: #Predicate { $0.timestamp >= from && $0.timestamp < until },
+            predicate: #Predicate { $0.timestamp < cursor },
             sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
         )
-        descriptor.fetchLimit = pageFetchLimit
+        descriptor.fetchLimit = limit
         return descriptor
     }
 
