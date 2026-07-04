@@ -59,6 +59,15 @@ struct TimelineView: View {
                 // is preserved across tab switches.
                 Task { await refreshInitialWindow() }
             }
+            .onChange(of: reflectingMoment) { previous, current in
+                // The sheet just dismissed. A reflection may have been saved (or
+                // cleared) — refresh counts so the "N waiting for reflection" banner
+                // reflects the just-changed state instead of waiting for the next
+                // tab switch.
+                if previous != nil, current == nil {
+                    refreshCounts()
+                }
+            }
         }
     }
 
@@ -269,15 +278,20 @@ struct TimelineView: View {
         defer { isLoading = false }
         let descriptor = MomentTimelineFetcher.descriptorBefore(cursor, limit: pageSize)
         let fetched = (try? modelContext.fetch(descriptor)) ?? []
-        // The cursor predicate is inclusive (`<= cursor`) so ties at the boundary
-        // don't fall through the crack of a strict `<`. That means the page overlaps
-        // with what we already have by at least one row in the common case — dedupe
-        // by id before appending. `hasReachedStart` is judged on the *raw* fetch
-        // count so pathological all-tie boundaries still terminate cleanly.
+        // Cursor predicate is inclusive (`<= cursor`) so ties at the boundary don't
+        // fall through the crack of a strict `<`. Dedupe by id before appending —
+        // in the common no-tie case that means one row of overlap per page.
         let seen = Set(moments.map(\.id))
         let fresh = fetched.filter { !seen.contains($0.id) }
         moments.append(contentsOf: fresh)
-        if fetched.count < pageSize {
+        // Terminate on either signal:
+        //  - fewer results than pageSize: SwiftData confirms nothing more exists.
+        //  - fresh is empty despite a full page: we're stuck on a tie cluster of
+        //    ≥ pageSize moments sharing an identical timestamp. Doubling limits or
+        //    switching to a compound cursor would recover this, but requiring >=50
+        //    moments at the same instant means a scripted bulk import or an internal
+        //    bug — not a real-user scenario. Terminate cleanly instead of spinning.
+        if fetched.count < pageSize || fresh.isEmpty {
             hasReachedStart = true
         }
     }
