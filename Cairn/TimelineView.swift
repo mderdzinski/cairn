@@ -68,6 +68,21 @@ struct TimelineView: View {
                     refreshCounts()
                 }
             }
+            .task {
+                // Restore the liveness we lost by moving off @Query. Any save on
+                // any ModelContext — our own writes, but also CloudKit imports
+                // syncing a watch capture — fires this notification. Refetch the
+                // newest page and cheap counts so Path stays live while it's on
+                // screen. The .task is cancelled when the view leaves the tree.
+                // No debounce: refresh is idempotent and cheap (two fetchCount
+                // queries plus a bounded page fetch), so back-to-back saves are
+                // fine.
+                for await _ in NotificationCenter.default.notifications(
+                    named: ModelContext.didSave
+                ) {
+                    await refreshInitialWindow()
+                }
+            }
         }
     }
 
