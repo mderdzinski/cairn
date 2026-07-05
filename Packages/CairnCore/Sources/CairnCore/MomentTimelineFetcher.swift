@@ -15,6 +15,33 @@ public enum MomentTimelineFetcher {
     /// "load more history" scrolling.
     public static let defaultPageSize = 50
 
+    /// Fetch the `limit` most recent moments in the store, newest first. No time
+    /// bound, so a moment with a future-dated timestamp (device clock skew, bulk
+    /// import) still surfaces — the timeline shows what's there, not just what's
+    /// happened by the current wall clock. Used for the very first page load
+    /// when no cursor exists yet.
+    public static func descriptorNewestPage(
+        limit: Int = defaultPageSize
+    ) -> FetchDescriptor<Moment> {
+        var descriptor = FetchDescriptor<Moment>(
+            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return descriptor
+    }
+
+    /// Fetch every moment whose timestamp is at or after `cursor`, newest first, no
+    /// limit. Used to reload the currently-loaded window on a `ModelContext.didSave`
+    /// notification: replacing the visible slice with a fresh consistent snapshot
+    /// picks up remote deletes, updates, and future-dated arrivals in one shot,
+    /// where a merge-and-carry-forward strategy would keep stale rows visible.
+    public static func descriptorNewerThan(_ cursor: Date) -> FetchDescriptor<Moment> {
+        FetchDescriptor<Moment>(
+            predicate: #Predicate { $0.timestamp >= cursor },
+            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+        )
+    }
+
     /// Fetch the `limit` most recent moments at or before `cursor`, newest first.
     /// Caller uses `moments.last?.timestamp` as the cursor for the next page and
     /// **must dedupe by id** because the predicate is inclusive on the boundary:

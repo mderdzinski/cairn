@@ -38,4 +38,19 @@ struct MomentTimelineFetcherTests {
         let descriptor = MomentTimelineFetcher.unreflectedCountDescriptor()
         #expect(descriptor.fetchLimit == nil)
     }
+
+    @Test("descriptorNewestPage uses the caller-supplied limit and no time bound")
+    func descriptorNewestPageShape() {
+        let descriptor = MomentTimelineFetcher.descriptorNewestPage(limit: 10)
+        #expect(descriptor.fetchLimit == 10)
+        // No predicate — the fetch is intentionally unbounded in time so future-dated
+        // moments still surface.
+        #expect(descriptor.predicate == nil)
+    }
+
+    @Test("descriptorNewerThan has no fetch limit — it reloads a known window")
+    func descriptorNewerThanNoLimit() {
+        let descriptor = MomentTimelineFetcher.descriptorNewerThan(.now)
+        #expect(descriptor.fetchLimit == nil)
+    }
 }

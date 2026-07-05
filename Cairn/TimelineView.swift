@@ -259,22 +259,38 @@ struct TimelineView: View {
         MomentTimelineFetcher.defaultPageSize
     }
 
-    /// Fires on first appear and every tab switch back to Path. Refetches the newest
-    /// page (`pageSize` most recent moments) and merges with anything older we've
-    /// already paged in, so a capture made on another tab shows up here without
-    /// scrapping paginated scroll position. Dedupes by id.
+    /// Fires on first appear, tab switch back to Path, and every ModelContext.didSave
+    /// while Path is visible. Replaces the loaded slice wholesale with a fresh
+    /// consistent snapshot from the store — so remote deletes propagate (a stale
+    /// merge-and-carry-forward strategy would leave deleted rows on screen), and
+    /// future-dated arrivals (device clock skew, imports) still surface (a `.now`
+    /// upper bound would drop them into a hole where they contribute to
+    /// totalStoreCount but never render).
     private func refreshInitialWindow() async {
         refreshCounts()
         guard !isLoading else { return }
+
+        // First appear: no cursor exists yet. Fetch the newest page unbounded so
+        // future-dated moments are included.
+        guard let oldestLoaded = moments.last?.timestamp else {
+            let fresh = (try? modelContext.fetch(
+                MomentTimelineFetcher.descriptorNewestPage(limit: pageSize)
+            )) ?? []
+            moments = fresh
+            hasReachedStart = fresh.count < pageSize
+            return
+        }
+
+        // Subsequent refreshes: refetch the entire currently-loaded slice as
+        // [oldestLoaded, ∞), no time upper bound. Bounded in practice by how far the
+        // user has paged back.
         let fresh = (try? modelContext.fetch(
-            MomentTimelineFetcher.descriptorBefore(.now, limit: pageSize)
+            MomentTimelineFetcher.descriptorNewerThan(oldestLoaded)
         )) ?? []
-        let freshIDs = Set(fresh.map(\.id))
-        let older = moments.filter { !freshIDs.contains($0.id) }
-        moments = fresh + older
-        // If the newest page came back with fewer than a full page AND nothing older
-        // is paged in, there is no more history to load.
-        hasReachedStart = fresh.count < pageSize && older.isEmpty
+        moments = fresh
+        // hasReachedStart only concerns whether there's more below the oldest paged
+        // timestamp — a wholesale reload of the same window doesn't tell us anything
+        // new about that boundary, so preserve its current value.
     }
 
     /// Called by the tail sentinel. Fetches the next page of moments strictly older
