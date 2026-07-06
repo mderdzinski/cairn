@@ -288,9 +288,14 @@ struct TimelineView: View {
             MomentTimelineFetcher.descriptorNewerThan(oldestLoaded)
         )) ?? []
         moments = fresh
-        // hasReachedStart only concerns whether there's more below the oldest paged
-        // timestamp — a wholesale reload of the same window doesn't tell us anything
-        // new about that boundary, so preserve its current value.
+        // If a CloudKit import or another context saved a moment *older* than
+        // oldestLoaded while we thought we had reached the start, the reloaded
+        // window won't include it — but totalStoreCount will. Clear the flag so
+        // the tail sentinel re-arms and loadMore can page the older arrival in.
+        // Only downshift: loadMore's own termination rule handles the true end.
+        if moments.count < totalStoreCount {
+            hasReachedStart = false
+        }
     }
 
     /// Called by the tail sentinel. Fetches the next page of moments strictly older
