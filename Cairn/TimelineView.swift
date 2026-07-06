@@ -7,10 +7,11 @@ struct TimelineView: View {
     @Environment(SyncStatusMonitor.self) private var syncMonitor
 
     @State private var moments: [Moment] = []
-    /// Flips true when a page-in returns fewer than the page size — that's the only
-    /// definitive signal SwiftData gives us that there are no older moments in the
-    /// store. Long gaps in capture history don't trigger this: cursor-based paging
-    /// just keeps flowing across them until the fetch genuinely runs dry.
+    /// Flips true when a page returns fewer than pageSize results — that's the only
+    /// definitive signal SwiftData gives us that there's nothing more strictly older
+    /// than the compound (timestamp, id) cursor. Long gaps in capture history don't
+    /// trigger this: cursor-based paging just keeps flowing across them until the
+    /// fetch genuinely runs dry.
     @State private var hasReachedStart = false
     /// Guards concurrent load attempts on rapid scroll or overlapping onAppear firings.
     @State private var isLoading = false
@@ -302,32 +303,27 @@ struct TimelineView: View {
     /// than the current oldest in `moments`. Cursor-based paging is gap-tolerant: a
     /// user with a long stretch of no captures doesn't get a false "start of your
     /// path" — the fetch just skips the empty stretch and returns older moments.
-    /// Only marks `hasReachedStart` when a page returns fewer than `pageSize` results,
-    /// which is SwiftData's definitive signal there's nothing more.
+    ///
+    /// Compound `(timestamp, id)` cursor means every page strictly advances the
+    /// cursor. No overlap, no dedupe needed, and dense timestamp ties don't strand
+    /// history. `hasReachedStart` flips iff the fetch returns fewer than `pageSize`
+    /// results — SwiftData's definitive signal there's nothing older.
     private func loadMore() async {
         guard !isLoading, !hasReachedStart else { return }
-        guard let cursor = moments.last?.timestamp else {
+        guard let last = moments.last else {
             // Nothing loaded yet — refreshInitialWindow will handle this via .onAppear.
             return
         }
         isLoading = true
         defer { isLoading = false }
-        let descriptor = MomentTimelineFetcher.descriptorBefore(cursor, limit: pageSize)
+        let descriptor = MomentTimelineFetcher.descriptorBefore(
+            timestamp: last.timestamp,
+            id: last.id,
+            limit: pageSize
+        )
         let fetched = (try? modelContext.fetch(descriptor)) ?? []
-        // Cursor predicate is inclusive (`<= cursor`) so ties at the boundary don't
-        // fall through the crack of a strict `<`. Dedupe by id before appending —
-        // in the common no-tie case that means one row of overlap per page.
-        let seen = Set(moments.map(\.id))
-        let fresh = fetched.filter { !seen.contains($0.id) }
-        moments.append(contentsOf: fresh)
-        // Terminate on either signal:
-        //  - fewer results than pageSize: SwiftData confirms nothing more exists.
-        //  - fresh is empty despite a full page: we're stuck on a tie cluster of
-        //    ≥ pageSize moments sharing an identical timestamp. Doubling limits or
-        //    switching to a compound cursor would recover this, but requiring >=50
-        //    moments at the same instant means a scripted bulk import or an internal
-        //    bug — not a real-user scenario. Terminate cleanly instead of spinning.
-        if fetched.count < pageSize || fresh.isEmpty {
+        moments.append(contentsOf: fetched)
+        if fetched.count < pageSize {
             hasReachedStart = true
         }
     }

@@ -4,27 +4,29 @@ import SwiftData
 /// Factories for the paged Path timeline. Keeps predicate + sort + limit shape in one
 /// place so the iOS surface and any future watch history reuse the same fetch shape.
 ///
-/// Paging is cursor-based (`timestamp < cursor` with a fixed page size) rather than
-/// window-based. That way a user with a large gap in their capture history — say
-/// nothing between January and July — doesn't hit a false "start of your path" when
-/// the pager sweeps across the empty stretch. Every fetch either returns more moments
-/// or definitively signals the start.
+/// Paging uses a **compound cursor** on `(timestamp, id)`, sorted reverse on both.
+/// Timestamp alone isn't enough — two moments can share the same instant (rapid
+/// captures, bulk import, cross-device sync) and any cursor over just timestamp
+/// either strands ties (`< T`) or infinite-loops (`<= T`). Adding the UUID id as a
+/// deterministic tiebreaker means every page strictly advances the cursor and every
+/// row is eventually reachable, regardless of tie density.
 public enum MomentTimelineFetcher {
-    /// Default page size for cursor-based fetches. Sized so an active user sees
-    /// several days per page and a light user sees weeks; both feel like normal
-    /// "load more history" scrolling.
+    /// Default page size. Sized so an active user sees several days per page and a
+    /// light user sees weeks; both feel like normal "load more history" scrolling.
     public static let defaultPageSize = 50
 
     /// Fetch the `limit` most recent moments in the store, newest first. No time
     /// bound, so a moment with a future-dated timestamp (device clock skew, bulk
-    /// import) still surfaces — the timeline shows what's there, not just what's
-    /// happened by the current wall clock. Used for the very first page load
-    /// when no cursor exists yet.
+    /// import) still surfaces. Used for the very first page load when no cursor
+    /// exists yet. Secondary sort on `id` gives deterministic ordering across pages.
     public static func descriptorNewestPage(
         limit: Int = defaultPageSize
     ) -> FetchDescriptor<Moment> {
         var descriptor = FetchDescriptor<Moment>(
-            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+            sortBy: [
+                SortDescriptor(\Moment.timestamp, order: .reverse),
+                SortDescriptor(\Moment.id, order: .reverse),
+            ]
         )
         descriptor.fetchLimit = limit
         return descriptor
@@ -38,26 +40,36 @@ public enum MomentTimelineFetcher {
     public static func descriptorNewerThan(_ cursor: Date) -> FetchDescriptor<Moment> {
         FetchDescriptor<Moment>(
             predicate: #Predicate { $0.timestamp >= cursor },
-            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+            sortBy: [
+                SortDescriptor(\Moment.timestamp, order: .reverse),
+                SortDescriptor(\Moment.id, order: .reverse),
+            ]
         )
     }
 
-    /// Fetch the `limit` most recent moments at or before `cursor`, newest first.
-    /// Caller uses `moments.last?.timestamp` as the cursor for the next page and
-    /// **must dedupe by id** because the predicate is inclusive on the boundary:
-    /// two moments sharing the cursor timestamp would otherwise slip through the
-    /// crack of a strict `<` cursor. In the common no-tie case, the overlap is at
-    /// most one row.
+    /// Fetch the `limit` most recent moments strictly before the compound cursor
+    /// `(timestamp, id)`. The predicate is
+    /// `timestamp < T || (timestamp == T && id < cursorID)`, sorted reverse on both,
+    /// so every page strictly advances the cursor and there is no overlap or
+    /// stranding at boundaries — even under dense timestamp ties.
     ///
     /// When the returned array has fewer than `limit` elements, there are no more
-    /// moments in the store at or before the cursor.
+    /// moments in the store strictly before the cursor: `hasReachedStart` should
+    /// flip on the caller.
     public static func descriptorBefore(
-        _ cursor: Date,
+        timestamp: Date,
+        id: UUID,
         limit: Int = defaultPageSize
     ) -> FetchDescriptor<Moment> {
         var descriptor = FetchDescriptor<Moment>(
-            predicate: #Predicate { $0.timestamp <= cursor },
-            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+            predicate: #Predicate { m in
+                m.timestamp < timestamp
+                    || (m.timestamp == timestamp && m.id < id)
+            },
+            sortBy: [
+                SortDescriptor(\Moment.timestamp, order: .reverse),
+                SortDescriptor(\Moment.id, order: .reverse),
+            ]
         )
         descriptor.fetchLimit = limit
         return descriptor

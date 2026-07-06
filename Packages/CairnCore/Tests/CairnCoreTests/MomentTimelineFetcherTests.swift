@@ -22,13 +22,20 @@ struct MomentTimelineFetcherTests {
 
     @Test("descriptorBefore uses the caller-supplied limit")
     func descriptorBeforeLimit() {
-        let descriptor = MomentTimelineFetcher.descriptorBefore(.now, limit: 25)
+        let descriptor = MomentTimelineFetcher.descriptorBefore(
+            timestamp: .now,
+            id: UUID(),
+            limit: 25
+        )
         #expect(descriptor.fetchLimit == 25)
     }
 
     @Test("descriptorBefore defaults to the documented page size")
     func descriptorBeforeDefaultLimit() {
-        let descriptor = MomentTimelineFetcher.descriptorBefore(.now)
+        let descriptor = MomentTimelineFetcher.descriptorBefore(
+            timestamp: .now,
+            id: UUID()
+        )
         #expect(descriptor.fetchLimit == MomentTimelineFetcher.defaultPageSize)
         #expect(MomentTimelineFetcher.defaultPageSize == 50)
     }
