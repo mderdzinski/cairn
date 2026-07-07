@@ -32,6 +32,11 @@ jobs:
           echo "Selected: $DEVICE"
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
 
+      - name: Test CairnCore package
+        run: |
+          set -o pipefail
+          swift test --package-path Packages/CairnCore
+
       - name: Build & test iOS (unit tests only)
         run: |
           set -o pipefail
