@@ -5,13 +5,27 @@ import SwiftUI
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncStatusMonitor.self) private var syncMonitor
-    @Query(sort: \Moment.timestamp, order: .reverse)
-    private var moments: [Moment]
-    @State private var reflectingMoment: Moment?
 
-    private var unreflectedCount: Int {
-        moments.lazy.filter { ($0.reflection ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
-    }
+    @State private var moments: [Moment] = []
+    /// Flips true when a page returns fewer than pageSize results — that's the only
+    /// definitive signal SwiftData gives us that there's nothing more strictly older
+    /// than the compound (timestamp, id) cursor. Long gaps in capture history don't
+    /// trigger this: cursor-based paging just keeps flowing across them until the
+    /// fetch genuinely runs dry.
+    @State private var hasReachedStart = false
+    /// Guards concurrent load attempts on rapid scroll or overlapping onAppear firings.
+    @State private var isLoading = false
+    /// Cheap all-time count via fetchCount. Drives the "no moments at all" empty state.
+    @State private var totalStoreCount = 0
+    /// Cheap trailing-7-day count via fetchCount. Drives the headline copy.
+    @State private var pastWeekCount = 0
+    /// Cheap all-time count of moments with no reflection via fetchCount. Drives the
+    /// "N moments waiting for reflection" banner — has to be a store-level query
+    /// because filtering the paged slice would undercount a user with older
+    /// unreflected moments below the current scroll position.
+    @State private var unreflectedCount = 0
+
+    @State private var reflectingMoment: Moment?
 
     var body: some View {
         NavigationStack {
@@ -39,12 +53,43 @@ struct TimelineView: View {
                     onDelete: { delete(moment) }
                 )
             }
+            .onAppear {
+                // Fires on first appear and every tab switch back to Path. Refetches
+                // the newest page (so captures made on other tabs / the watch show up)
+                // and merges with anything older we've paged in — so scroll position
+                // is preserved across tab switches.
+                Task { await refreshInitialWindow() }
+            }
+            .onChange(of: reflectingMoment) { previous, current in
+                // The sheet just dismissed. A reflection may have been saved (or
+                // cleared) — refresh counts so the "N waiting for reflection" banner
+                // reflects the just-changed state instead of waiting for the next
+                // tab switch.
+                if previous != nil, current == nil {
+                    refreshCounts()
+                }
+            }
+            .task {
+                // Restore the liveness we lost by moving off @Query. Any save on
+                // any ModelContext — our own writes, but also CloudKit imports
+                // syncing a watch capture — fires this notification. Refetch the
+                // newest page and cheap counts so Path stays live while it's on
+                // screen. The .task is cancelled when the view leaves the tree.
+                // No debounce: refresh is idempotent and cheap (two fetchCount
+                // queries plus a bounded page fetch), so back-to-back saves are
+                // fine.
+                for await _ in NotificationCenter.default.notifications(
+                    named: ModelContext.didSave
+                ) {
+                    await refreshInitialWindow()
+                }
+            }
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        if moments.isEmpty {
+        if totalStoreCount == 0 {
             emptyState
         } else {
             VStack(alignment: .leading, spacing: 0) {
@@ -69,14 +114,19 @@ struct TimelineView: View {
                     .tracking(CairnTracking.eyebrowCaps)
                     .foregroundStyle(Color.cairnTextTertiary)
                     .textCase(.uppercase)
-                Text("\(moments.count) \(moments.count == 1 ? "moment" : "moments")")
+                Text(headlineText)
                     .font(.cairnSerif(size: 28, weight: .light))
                     .foregroundStyle(Color.cairnTextPrimary)
             }
             Spacer(minLength: 0)
-            StoneStack(count: min(max(moments.count, 1), 6), size: .small)
+            StoneStack(count: min(max(pastWeekCount, 1), 6), size: .small)
                 .alignmentGuide(.firstTextBaseline) { dim in dim[VerticalAlignment.center] }
         }
+    }
+
+    private var headlineText: String {
+        let noun = pastWeekCount == 1 ? "moment" : "moments"
+        return "\(pastWeekCount) \(noun) this week"
     }
 
     private var unreflectedBanner: some View {
@@ -121,9 +171,41 @@ struct TimelineView: View {
                         .textCase(.uppercase)
                 }
             }
+            tailSentinel
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private var tailSentinel: some View {
+        if hasReachedStart {
+            Section {
+                Text("You've reached the start of your path.")
+                    .font(.cairnLabel)
+                    .foregroundStyle(Color.cairnTextTertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .padding(.vertical, CairnSpacing.size4)
+            }
+        } else {
+            Section {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Color.cairnTextTertiary)
+                    Spacer()
+                }
+                .padding(.vertical, CairnSpacing.size3)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .onAppear {
+                    Task { await loadMore() }
+                }
+            }
+        }
     }
 
     /// Row background with rounded trailing corners so the row sits neatly next to
@@ -172,11 +254,98 @@ struct TimelineView: View {
         return day.formatted(date: .abbreviated, time: .omitted)
     }
 
+    // MARK: - Data loading
+
+    private var pageSize: Int {
+        MomentTimelineFetcher.defaultPageSize
+    }
+
+    /// Fires on first appear, tab switch back to Path, and every ModelContext.didSave
+    /// while Path is visible. Replaces the loaded slice wholesale with a fresh
+    /// consistent snapshot from the store — so remote deletes propagate (a stale
+    /// merge-and-carry-forward strategy would leave deleted rows on screen), and
+    /// future-dated arrivals (device clock skew, imports) still surface (a `.now`
+    /// upper bound would drop them into a hole where they contribute to
+    /// totalStoreCount but never render).
+    private func refreshInitialWindow() async {
+        refreshCounts()
+        guard !isLoading else { return }
+
+        // First appear: no cursor exists yet. Fetch the newest page unbounded so
+        // future-dated moments are included.
+        guard let oldestLoaded = moments.last?.timestamp else {
+            let fresh = (try? modelContext.fetch(
+                MomentTimelineFetcher.descriptorNewestPage(limit: pageSize)
+            )) ?? []
+            moments = fresh
+            hasReachedStart = fresh.count < pageSize
+            return
+        }
+
+        // Subsequent refreshes: refetch the entire currently-loaded slice as
+        // [oldestLoaded, ∞), no time upper bound. Bounded in practice by how far the
+        // user has paged back.
+        let fresh = (try? modelContext.fetch(
+            MomentTimelineFetcher.descriptorNewerThan(oldestLoaded)
+        )) ?? []
+        moments = fresh
+        // If a CloudKit import or another context saved a moment *older* than
+        // oldestLoaded while we thought we had reached the start, the reloaded
+        // window won't include it — but totalStoreCount will. Clear the flag so
+        // the tail sentinel re-arms and loadMore can page the older arrival in.
+        // Only downshift: loadMore's own termination rule handles the true end.
+        if moments.count < totalStoreCount {
+            hasReachedStart = false
+        }
+    }
+
+    /// Called by the tail sentinel. Fetches the next page of moments strictly older
+    /// than the current oldest in `moments`. Cursor-based paging is gap-tolerant: a
+    /// user with a long stretch of no captures doesn't get a false "start of your
+    /// path" — the fetch just skips the empty stretch and returns older moments.
+    ///
+    /// Compound `(timestamp, id)` cursor means every page strictly advances the
+    /// cursor. No overlap, no dedupe needed, and dense timestamp ties don't strand
+    /// history. `hasReachedStart` flips iff the fetch returns fewer than `pageSize`
+    /// results — SwiftData's definitive signal there's nothing older.
+    private func loadMore() async {
+        guard !isLoading, !hasReachedStart else { return }
+        guard let last = moments.last else {
+            // Nothing loaded yet — refreshInitialWindow will handle this via .onAppear.
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        let descriptor = MomentTimelineFetcher.descriptorBefore(
+            timestamp: last.timestamp,
+            id: last.id,
+            limit: pageSize
+        )
+        let fetched = (try? modelContext.fetch(descriptor)) ?? []
+        moments.append(contentsOf: fetched)
+        if fetched.count < pageSize {
+            hasReachedStart = true
+        }
+    }
+
+    /// Runs the cheap fetch-count queries used by the header, banner, and empty state.
+    private func refreshCounts() {
+        totalStoreCount = (try? modelContext.fetchCount(FetchDescriptor<Moment>())) ?? 0
+        pastWeekCount = (try? modelContext.fetchCount(
+            MomentTimelineFetcher.pastWeekCountDescriptor()
+        )) ?? 0
+        unreflectedCount = (try? modelContext.fetchCount(
+            MomentTimelineFetcher.unreflectedCountDescriptor()
+        )) ?? 0
+    }
+
     private func delete(_ moment: Moment) {
         if reflectingMoment?.id == moment.id {
             reflectingMoment = nil
         }
         modelContext.delete(moment)
+        moments.removeAll { $0.id == moment.id }
+        refreshCounts()
     }
 }
 
