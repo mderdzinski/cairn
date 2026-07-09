@@ -1,5 +1,7 @@
 # Cairn
 
+**Status:** v1.0, preparing for App Store submission.
+
 Cairn is a lightweight iOS and watchOS app for cultivating awareness by capturing meaningful moments in real time and reflecting on them later.
 
 ## The idea
