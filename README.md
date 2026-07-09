@@ -1,39 +1,47 @@
 # Cairn
 
-**Status:** v1.0, preparing for App Store submission.
+A quiet iOS and watchOS app for noticing what you feel and returning to reflect on it later.
 
-Cairn is a lightweight iOS and watchOS app for cultivating awareness by capturing meaningful moments in real time and reflecting on them later.
+**Site:** [noticedaily.com](https://noticedaily.com)
+**Status:** v1.0, in App Store review.
 
-## The idea
+## What Cairn is
 
-Personal growth comes from noticing. Each captured moment is a stone placed along a path. Individually they may seem insignificant, but over time they form a cairn — a set of markers that helps you identify recurring sources of fulfillment, frustration, growth, and insight.
+Most of what we feel passes without a mark. Cairn is a small practice for changing that.
 
-## How it works
+You capture a moment in a second. One of six categories (contentment, desire, aversion, restlessness, heaviness, doubt), one tap on your watch or phone. No typing, no forms, nothing that takes you out of the moment you noticed.
 
-**Capture is frictionless.** From a watch complication or app button, you record a moment as either *Contentment* or one of several predefined categories of hindrance or friction. The interaction takes only a few seconds and is usable in the middle of daily life — no typing required.
+Later, Cairn invites you back to reflect.
 
-**Reflection is deferred.** Cairn doesn't ask you to journal in the moment. Later, the app prompts you to revisit recorded moments, add context, and reflect on what happened, why it mattered, and whether any patterns are emerging.
-
-**Patterns surface over time.** A longitudinal record of moments lets you see your own recurring sources of fulfillment and friction without anyone telling you what they mean.
-
-## Goals for v1
-
-- Extremely fast capture flow optimized for the watch.
-- Record timestamp, category, and optional later reflection.
-- Scheduled or intelligently timed reflection prompts.
-- A longitudinal record of meaningful moments.
-- Surface patterns and trends across entries over time.
-- Encourage awareness without the burden of a traditional journaling practice.
-
-## Explicit non-goals for v1
-
-- Social features.
-- Productivity tracking.
-- Clinical mental health interventions.
-- AI-generated coaching or recommendations.
+Over time, the stones form a path you can read. Not a score. Not a streak. Just what you noticed, laid out so you can see it.
 
 ## Stack
 
-- Native iOS + watchOS (Swift, SwiftUI, WatchKit).
-- Local-first storage with iCloud (CloudKit) sync across the user's own Apple devices.
-- Android support is deferred until the capture and reflection model is validated.
+- iOS and watchOS, native, Swift with SwiftUI and WatchKit.
+- Local-first with SwiftData for persistence.
+- CloudKit for sync across your own Apple devices. No backend.
+- CairnCore, a small Swift package with the model, aggregates, and colors, shared by both platforms.
+- A design system with warm-stone neutrals and a grounded sage green. See `/tokens` in the sibling [`cairn-site`](https://github.com/mderdzinski/cairn-site) repo.
+
+## Layout
+
+```
+Cairn/                     iOS app target
+Cairn Watch App/           watchOS app target
+Cairn Watch Widgets/       accessory-family complications
+Packages/CairnCore/        shared Swift package (model + aggregates)
+```
+
+## Building
+
+- Xcode 26.5 or newer, iOS 18 and watchOS 11 SDK.
+- Fork the repo, open `Cairn.xcodeproj`, and change `DEVELOPMENT_TEAM` in the pbxproj to your own Apple Developer Team ID.
+- Cairn uses CloudKit. First run will register a container under your team.
+
+## Contributing
+
+Small personal project, one maintainer, replies may be slow. Bug reports and small fixes are welcome via issues and pull requests. Please open an issue before starting on a larger change so we can agree on scope.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
