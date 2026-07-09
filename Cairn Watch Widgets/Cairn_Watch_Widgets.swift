@@ -25,7 +25,7 @@ struct CairnCaptureLauncherView: View {
             Label("Cairn", systemImage: "mountain.2")
         case .accessoryRectangular:
             HStack(spacing: 8) {
-                Image("CairnGlyph")
+                Image("CairnComplication")
                     .renderingMode(.template)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -36,7 +36,7 @@ struct CairnCaptureLauncherView: View {
                 Spacer(minLength: 0)
             }
         default:
-            Image("CairnGlyph")
+            Image("CairnComplication")
                 .renderingMode(.template)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
