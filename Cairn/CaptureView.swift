@@ -8,23 +8,18 @@ struct CaptureView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Query private var todayMoments: [Moment]
+    @Environment(\.scenePhase) private var scenePhase
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
     @State private var feedback = UIImpactFeedbackGenerator(style: .medium)
 
+    // The boundary that defines "today" for the stone count. Held in state — not baked
+    // into a query at init — so it can be re-derived when the day rolls over while the
+    // app sits resident in the background. See refreshToday().
+    @State private var todayStart = Calendar.current.startOfDay(for: .now)
+
     init(onSeePath: @escaping () -> Void = {}) {
         self.onSeePath = onSeePath
-        let startOfDay = Calendar.current.startOfDay(for: .now)
-        let descriptor = FetchDescriptor<Moment>(
-            predicate: #Predicate { $0.timestamp >= startOfDay },
-            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
-        )
-        _todayMoments = Query(descriptor)
-    }
-
-    private var todaysMomentCount: Int {
-        todayMoments.count
     }
 
     private let columns = [
@@ -33,6 +28,20 @@ struct CaptureView: View {
     ]
 
     var body: some View {
+        TodayMomentsReader(dayStart: todayStart) { todayCount in
+            screen(todayCount: todayCount)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Foregrounding after a suspend that crossed midnight won't have delivered
+            // NSCalendarDayChanged, so re-derive the boundary on every activation.
+            if phase == .active { refreshToday() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            refreshToday()
+        }
+    }
+
+    private func screen(todayCount: Int) -> some View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
             sageBackdrop
@@ -42,7 +51,7 @@ struct CaptureView: View {
                 Spacer(minLength: CairnSpacing.size8)
                 grid
                 Spacer(minLength: CairnSpacing.size6)
-                footer
+                footer(todayCount: todayCount)
             }
             .padding(.horizontal, CairnSpacing.gutter)
             .padding(.bottom, CairnSpacing.size6)
@@ -58,6 +67,13 @@ struct CaptureView: View {
             }
         }
         .task { feedback.prepare() }
+    }
+
+    /// Re-derive the start-of-today boundary. Assigning only when it actually changed
+    /// keeps this from invalidating the view (and its query) on every activation.
+    private func refreshToday() {
+        let start = Calendar.current.startOfDay(for: .now)
+        if start != todayStart { todayStart = start }
     }
 
     private var header: some View {
@@ -87,12 +103,12 @@ struct CaptureView: View {
         .frame(maxHeight: .infinity)
     }
 
-    private var footer: some View {
+    private func footer(todayCount: Int) -> some View {
         Button(action: onSeePath) {
             HStack(spacing: CairnSpacing.size3) {
-                StoneStack(count: min(max(todaysMomentCount, 1), 6), size: .small)
+                StoneStack(count: min(max(todayCount, 1), 6), size: .small)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(stoneCountLine)
+                    Text(stoneCountLine(todayCount: todayCount))
                         .font(.cairnLabel)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.cairnTextPrimary)
@@ -142,9 +158,8 @@ struct CaptureView: View {
         return "\(weekday) · \(monthDay)"
     }
 
-    private var stoneCountLine: String {
-        let count = todaysMomentCount
-        return "\(count) \(count == 1 ? "stone" : "stones") today"
+    private func stoneCountLine(todayCount: Int) -> String {
+        "\(todayCount) \(todayCount == 1 ? "stone" : "stones") today"
     }
 
     private func capture(_ category: MomentCategory) {

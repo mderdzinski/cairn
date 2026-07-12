@@ -26,7 +26,7 @@ struct WatchRootView: View {
         Group {
             switch screen {
             case .home:
-                TodayStoneCount(dayStart: todayStart) { todayCount in
+                TodayMomentsReader(dayStart: todayStart) { todayCount in
                     WatchHomeView(todayCount: todayCount) {
                         MotionGate.animate(reduceMotion: reduceMotion, .easeInOut(duration: 0.2)) {
                             screen = .capture
@@ -87,23 +87,5 @@ struct WatchRootView: View {
                 screen = .home
             }
         }
-    }
-}
-
-/// Owns the "moments logged today" query. Isolated into its own view so the query is
-/// reconstructed from `dayStart` each time that boundary changes — SwiftData `@Query`
-/// can only be reconfigured through a view's initializer, so a changing "today" needs
-/// its own view whose init reruns when the boundary moves.
-private struct TodayStoneCount<Content: View>: View {
-    @Query private var todayMoments: [Moment]
-    private let content: (Int) -> Content
-
-    init(dayStart: Date, @ViewBuilder content: @escaping (Int) -> Content) {
-        self.content = content
-        _todayMoments = Query(MomentTimelineFetcher.todayCountDescriptor(now: dayStart))
-    }
-
-    var body: some View {
-        content(todayMoments.count)
     }
 }
