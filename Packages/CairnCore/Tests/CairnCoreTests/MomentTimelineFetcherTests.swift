@@ -1,5 +1,6 @@
 @testable import CairnCore
 import Foundation
+import SwiftData
 import Testing
 
 @Suite("MomentTimelineFetcher")
@@ -59,5 +60,60 @@ struct MomentTimelineFetcherTests {
     func descriptorNewerThanNoLimit() {
         let descriptor = MomentTimelineFetcher.descriptorNewerThan(.now)
         #expect(descriptor.fetchLimit == nil)
+    }
+
+    @Test("todayCountDescriptor counts only moments at or after the start of today")
+    func todayCountDescriptorCountsToday() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents(year: 2026, month: 7, day: 4, hour: 10, minute: 30)
+        components.calendar = calendar
+        let now = calendar.date(from: components) ?? Date()
+        let startOfToday = calendar.startOfDay(for: now)
+
+        let container = try ModelContainer(
+            for: Moment.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        // Two moments earlier today, one just after midnight (still today), and two
+        // from previous days that must be excluded.
+        context.insert(Moment(timestamp: now))
+        context.insert(Moment(timestamp: startOfToday.addingTimeInterval(60)))
+        context.insert(Moment(timestamp: startOfToday))
+        context.insert(Moment(timestamp: startOfToday.addingTimeInterval(-1)))
+        context.insert(Moment(timestamp: startOfToday.addingTimeInterval(-86400)))
+
+        let count = try context.fetchCount(
+            MomentTimelineFetcher.todayCountDescriptor(now: now, calendar: calendar)
+        )
+        #expect(count == 3)
+    }
+
+    @Test("todayCountDescriptor boundary follows now — yesterday's cutoff drops a day")
+    func todayCountDescriptorFollowsNow() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        var yesterdayComponents = DateComponents(year: 2026, month: 7, day: 3, hour: 9)
+        yesterdayComponents.calendar = calendar
+        let yesterday = calendar.date(from: yesterdayComponents) ?? Date()
+        let today = calendar.date(byAdding: .day, value: 1, to: yesterday) ?? Date()
+
+        let container = try ModelContainer(
+            for: Moment.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        // A single moment logged yesterday morning.
+        context.insert(Moment(timestamp: yesterday))
+
+        // Yesterday's descriptor counts it; today's descriptor — the boundary having
+        // rolled forward — must not. This is exactly the watch's midnight-rollover case.
+        let countYesterday = try context.fetchCount(
+            MomentTimelineFetcher.todayCountDescriptor(now: yesterday, calendar: calendar)
+        )
+        let countToday = try context.fetchCount(
+            MomentTimelineFetcher.todayCountDescriptor(now: today, calendar: calendar)
+        )
+        #expect(countYesterday == 1)
+        #expect(countToday == 0)
     }
 }

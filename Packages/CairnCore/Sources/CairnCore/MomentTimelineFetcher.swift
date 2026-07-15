@@ -109,4 +109,23 @@ public enum MomentTimelineFetcher {
         let startOfToday = calendar.startOfDay(for: now)
         return calendar.date(byAdding: .day, value: -6, to: startOfToday) ?? startOfToday
     }
+
+    /// Descriptor that counts moments logged today — timestamp at or after the start
+    /// of `now`'s calendar day — newest first.
+    ///
+    /// **This must be rebuilt whenever the day rolls over.** A descriptor captured
+    /// once at view-init freezes "today" at that instant; on a long-lived process
+    /// (notably the watch app, which stays resident across midnight) that keeps
+    /// counting a previous day's moments as "today". Callers pass the current
+    /// `now` and re-derive this on foreground and on `.NSCalendarDayChanged`.
+    public static func todayCountDescriptor(
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> FetchDescriptor<Moment> {
+        let startOfToday = calendar.startOfDay(for: now)
+        return FetchDescriptor<Moment>(
+            predicate: #Predicate { $0.timestamp >= startOfToday },
+            sortBy: [SortDescriptor(\Moment.timestamp, order: .reverse)]
+        )
+    }
 }
