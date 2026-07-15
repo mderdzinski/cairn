@@ -4,6 +4,8 @@ import SwiftUI
 
 @main
 struct CairnWatchApp: App {
+    @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var appDelegate
+
     private let sharedModelContainer: ModelContainer = {
         do {
             return try MomentStore.makeContainer(
@@ -17,7 +19,7 @@ struct CairnWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchRootView()
+            WatchRootView(notificationRouter: appDelegate.notificationRouter)
         }
         .modelContainer(sharedModelContainer)
     }

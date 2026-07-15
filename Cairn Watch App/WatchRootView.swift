@@ -13,6 +13,7 @@ struct WatchRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    let notificationRouter: WatchNotificationRouter
     @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
 
@@ -48,6 +49,15 @@ struct WatchRootView: View {
         }
         .motionAwareAnimation(.easeInOut(duration: 0.25), value: screen, reduceMotion: reduceMotion)
         .onOpenURL(perform: handleDeepLink)
+        .task {
+            // A notification tapped while the app was not running (cold launch) leaves
+            // its deep link waiting on the router before this view's body first ran.
+            // Consume it once the view is live.
+            consumePendingDeepLink()
+        }
+        .onChange(of: notificationRouter.pendingDeepLink) { _, _ in
+            consumePendingDeepLink()
+        }
         .onChange(of: scenePhase) { _, phase in
             // Foregrounding after a suspend that crossed midnight won't have delivered
             // NSCalendarDayChanged, so re-derive the boundary on every activation.
@@ -56,6 +66,14 @@ struct WatchRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             refreshToday()
         }
+    }
+
+    /// Route a deep link delivered by a tapped notification, then clear it so the
+    /// same tap can't be replayed on a later view update.
+    private func consumePendingDeepLink() {
+        guard let url = notificationRouter.pendingDeepLink else { return }
+        handleDeepLink(url)
+        notificationRouter.pendingDeepLink = nil
     }
 
     /// Re-derive the start-of-today boundary. Assigning only when it actually changed
