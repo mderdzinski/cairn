@@ -16,10 +16,10 @@ struct WatchRootView: View {
     @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
 
-    // The boundary that defines "today" for the stone count. Held in state — not baked
-    // into a query at init — so it can be re-derived when the day rolls over. The watch
-    // app process stays resident across midnight; a fixed init-time cutoff would keep
-    // counting a previous day's moments as today's. See refreshToday().
+    /// The boundary that defines "today" for the stone count. Held in state — not baked
+    /// into a query at init — so it can be re-derived when the day rolls over. The watch
+    /// app process stays resident across midnight; a fixed init-time cutoff would keep
+    /// counting a previous day's moments as today's. See refreshToday().
     @State private var todayStart = Calendar.current.startOfDay(for: .now)
 
     var body: some View {

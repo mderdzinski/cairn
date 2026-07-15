@@ -13,9 +13,9 @@ struct CaptureView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var feedback = UIImpactFeedbackGenerator(style: .medium)
 
-    // The boundary that defines "today" for the stone count. Held in state — not baked
-    // into a query at init — so it can be re-derived when the day rolls over while the
-    // app sits resident in the background. See refreshToday().
+    /// The boundary that defines "today" for the stone count. Held in state — not baked
+    /// into a query at init — so it can be re-derived when the day rolls over while the
+    /// app sits resident in the background. See refreshToday().
     @State private var todayStart = Calendar.current.startOfDay(for: .now)
 
     init(onSeePath: @escaping () -> Void = {}) {

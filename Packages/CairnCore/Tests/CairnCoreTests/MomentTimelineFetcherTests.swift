@@ -81,7 +81,7 @@ struct MomentTimelineFetcherTests {
         context.insert(Moment(timestamp: startOfToday.addingTimeInterval(60)))
         context.insert(Moment(timestamp: startOfToday))
         context.insert(Moment(timestamp: startOfToday.addingTimeInterval(-1)))
-        context.insert(Moment(timestamp: startOfToday.addingTimeInterval(-86_400)))
+        context.insert(Moment(timestamp: startOfToday.addingTimeInterval(-86400)))
 
         let count = try context.fetchCount(
             MomentTimelineFetcher.todayCountDescriptor(now: now, calendar: calendar)
