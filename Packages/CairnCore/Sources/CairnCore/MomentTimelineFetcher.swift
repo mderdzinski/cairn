@@ -120,9 +120,7 @@ public enum MomentTimelineFetcher {
         let cutoff = pastWeekCutoff(now: now, calendar: calendar)
         return FetchDescriptor<Moment>(
             // swiftlint:disable:next empty_string
-            predicate: #Predicate {
-                ($0.reflection == nil || $0.reflection == "") && $0.timestamp >= cutoff
-            }
+            predicate: #Predicate { ($0.reflection == nil || $0.reflection == "") && $0.timestamp >= cutoff }
         )
     }
 

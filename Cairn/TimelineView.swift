@@ -133,6 +133,11 @@ struct TimelineView: View {
         return "\(pastWeekCount) \(noun) this week"
     }
 
+    private var bannerText: String {
+        let noun = recentUnreflectedCount == 1 ? "moment" : "moments"
+        return "\(recentUnreflectedCount) \(noun) waiting for reflection"
+    }
+
     private func unreflectedBanner(proxy: ScrollViewProxy) -> some View {
         Button {
             scrollToFirstUnreflected(proxy: proxy)
@@ -142,7 +147,7 @@ struct TimelineView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.cairnAccentInk)
                     .accessibilityHidden(true)
-                Text("\(recentUnreflectedCount) \(recentUnreflectedCount == 1 ? "moment" : "moments") waiting for reflection")
+                Text(bannerText)
                     .font(.cairnLabel.weight(.medium))
                     .foregroundStyle(Color.cairnAccentInk)
                 Spacer(minLength: 0)
