@@ -12,4 +12,8 @@
 --stripunusedargs closure-only
 --header strip
 
+# Enabled by default since SwiftFormat 0.62; conflict with existing repo style
+# (single-line if bodies, regular comments on non-API declarations).
+--disable wrapIfStatementBodies,docComments
+
 --exclude .build,build,DerivedData,**/.build,Packages/*/.build,**/Generated

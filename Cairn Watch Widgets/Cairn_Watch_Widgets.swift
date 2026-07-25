@@ -8,7 +8,9 @@ struct CairnCaptureLauncher: Widget {
         StaticConfiguration(kind: kind, provider: StaticEntryProvider()) { _ in
             CairnCaptureLauncherView()
                 .widgetURL(URL(string: "cairn://capture"))
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) {
+                    AccessoryWidgetBackground()
+                }
         }
         .configurationDisplayName("Capture a moment")
         .description("Tap to mark a moment in Cairn.")
@@ -25,24 +27,30 @@ struct CairnCaptureLauncherView: View {
             Label("Cairn", systemImage: "mountain.2")
         case .accessoryRectangular:
             HStack(spacing: 8) {
-                Image("CairnComplication")
-                    .renderingMode(.template)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+                mark
                     .frame(width: 22, height: 22)
-                    .widgetAccentable()
                 Text("Capture a moment")
                     .font(.body)
                 Spacer(minLength: 0)
             }
         default:
-            Image("CairnComplication")
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
+            mark
                 .padding(4)
-                .widgetAccentable()
         }
+    }
+
+    // The cairn mark, drawn so it survives the always-on / tinted-face pass.
+    // watchOS re-renders dimmed complications in an accented/vibrant mode that
+    // flattens content by luminance; anchoring to `.primary` (rather than an
+    // inherited faint style) keeps the glyph fully opaque when the display dims,
+    // while `widgetAccentable()` still lets tinted faces recolor it.
+    private var mark: some View {
+        Image("CairnComplication")
+            .renderingMode(.template)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .foregroundStyle(.primary)
+            .widgetAccentable()
     }
 }
 
