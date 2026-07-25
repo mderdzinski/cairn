@@ -5,6 +5,7 @@ import SwiftUI
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncStatusMonitor.self) private var syncMonitor
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var moments: [Moment] = []
     /// Flips true when a page returns fewer than pageSize results — that's the only
@@ -19,11 +20,13 @@ struct TimelineView: View {
     @State private var totalStoreCount = 0
     /// Cheap trailing-7-day count via fetchCount. Drives the headline copy.
     @State private var pastWeekCount = 0
-    /// Cheap all-time count of moments with no reflection via fetchCount. Drives the
-    /// "N moments waiting for reflection" banner — has to be a store-level query
-    /// because filtering the paged slice would undercount a user with older
-    /// unreflected moments below the current scroll position.
-    @State private var unreflectedCount = 0
+    /// Cheap count of *recent* moments (trailing 7 days, same window as the "this
+    /// week" headline) with no reflection, via fetchCount. Drives the "N moments
+    /// waiting for reflection" banner. Store-level query rather than filtering the
+    /// paged slice: it stays honest regardless of scroll position, and bounding it
+    /// to the recent window keeps the prompt a gentle invitation instead of an
+    /// ever-growing all-time backlog — older unreflected moments age out of it.
+    @State private var recentUnreflectedCount = 0
 
     @State private var reflectingMoment: Moment?
 
@@ -69,6 +72,18 @@ struct TimelineView: View {
                     refreshCounts()
                 }
             }
+            .onChange(of: scenePhase) { _, phase in
+                // The week-bounded counts (headline and reflection banner) bake
+                // their cutoff in at fetch time, so they go stale when the day
+                // rolls over while Path stays mounted. Foregrounding after a
+                // suspend that crossed midnight won't have delivered
+                // NSCalendarDayChanged, so re-derive on every activation — same
+                // pattern as CaptureView's today count.
+                if phase == .active { refreshCounts() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                refreshCounts()
+            }
             .task {
                 // Restore the liveness we lost by moving off @Query. Any save on
                 // any ModelContext — our own writes, but also CloudKit imports
@@ -92,16 +107,18 @@ struct TimelineView: View {
         if totalStoreCount == 0 {
             emptyState
         } else {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.horizontal, CairnSpacing.gutter)
-                    .padding(.top, CairnSpacing.size2)
-                if unreflectedCount > 0 {
-                    unreflectedBanner
+            ScrollViewReader { proxy in
+                VStack(alignment: .leading, spacing: 0) {
+                    header
                         .padding(.horizontal, CairnSpacing.gutter)
-                        .padding(.top, CairnSpacing.size4)
+                        .padding(.top, CairnSpacing.size2)
+                    if recentUnreflectedCount > 0 {
+                        unreflectedBanner(proxy: proxy)
+                            .padding(.horizontal, CairnSpacing.gutter)
+                            .padding(.top, CairnSpacing.size4)
+                    }
+                    list
                 }
-                list
             }
         }
     }
@@ -129,28 +146,64 @@ struct TimelineView: View {
         return "\(pastWeekCount) \(noun) this week"
     }
 
-    private var unreflectedBanner: some View {
-        HStack(spacing: CairnSpacing.size2) {
-            Image(systemName: "pencil")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.cairnAccentInk)
-                .accessibilityHidden(true)
-            Text("\(unreflectedCount) \(unreflectedCount == 1 ? "moment" : "moments") waiting for reflection")
-                .font(.cairnLabel.weight(.medium))
-                .foregroundStyle(Color.cairnAccentInk)
-            Spacer(minLength: 0)
+    private var bannerText: String {
+        let noun = recentUnreflectedCount == 1 ? "moment" : "moments"
+        return "\(recentUnreflectedCount) \(noun) waiting for reflection"
+    }
+
+    private func unreflectedBanner(proxy: ScrollViewProxy) -> some View {
+        Button {
+            scrollToFirstUnreflected(proxy: proxy)
+        } label: {
+            HStack(spacing: CairnSpacing.size2) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.cairnAccentInk)
+                    .accessibilityHidden(true)
+                Text(bannerText)
+                    .font(.cairnLabel.weight(.medium))
+                    .foregroundStyle(Color.cairnAccentInk)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.cairnAccentInk.opacity(0.6))
+                    .accessibilityHidden(true)
+            }
+            .padding(.vertical, CairnSpacing.size3)
+            .padding(.horizontal, CairnSpacing.size3)
+            .background(Color.cairnSage50)
+            .clipShape(RoundedRectangle(cornerRadius: CairnRadii.medium))
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, CairnSpacing.size3)
-        .padding(.horizontal, CairnSpacing.size3)
-        .background(Color.cairnSage50)
-        .clipShape(RoundedRectangle(cornerRadius: CairnRadii.medium))
+        .buttonStyle(.plain)
+        .accessibilityHint("Jumps to the first moment waiting for reflection")
+    }
+
+    /// The newest moment still inside the recent window that has no reflection —
+    /// the first one the reader meets scrolling down from the top. `nil` when none
+    /// is currently paged in (in practice the recent window sits inside the first
+    /// page, so this resolves), in which case the banner tap is a no-op.
+    private var firstRecentUnreflectedID: UUID? {
+        let cutoff = MomentTimelineFetcher.pastWeekCutoff()
+        return moments.first { $0.timestamp >= cutoff && isUnreflected($0) }?.id
+    }
+
+    private func isUnreflected(_ moment: Moment) -> Bool {
+        moment.reflection?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+    }
+
+    private func scrollToFirstUnreflected(proxy: ScrollViewProxy) {
+        guard let targetID = firstRecentUnreflectedID else { return }
+        withAnimation {
+            proxy.scrollTo(targetID, anchor: .top)
+        }
     }
 
     private var list: some View {
         List {
             ForEach(groupedDays, id: \.self) { day in
                 Section {
-                    ForEach(grouped[day] ?? []) { moment in
+                    ForEach(grouped[day] ?? [], id: \.id) { moment in
                         TimelineEntry(moment: moment) {
                             reflectingMoment = moment
                         }
@@ -334,8 +387,8 @@ struct TimelineView: View {
         pastWeekCount = (try? modelContext.fetchCount(
             MomentTimelineFetcher.pastWeekCountDescriptor()
         )) ?? 0
-        unreflectedCount = (try? modelContext.fetchCount(
-            MomentTimelineFetcher.unreflectedCountDescriptor()
+        recentUnreflectedCount = (try? modelContext.fetchCount(
+            MomentTimelineFetcher.unreflectedRecentCountDescriptor()
         )) ?? 0
     }
 

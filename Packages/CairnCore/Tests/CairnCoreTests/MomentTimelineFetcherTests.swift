@@ -47,6 +47,34 @@ struct MomentTimelineFetcherTests {
         #expect(descriptor.fetchLimit == nil)
     }
 
+    @Test("unreflectedRecentCountDescriptor counts only unreflected moments inside the 7-day window")
+    func unreflectedRecentCountDescriptorWindowsAndReflection() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents(year: 2026, month: 7, day: 4, hour: 10, minute: 30)
+        components.calendar = calendar
+        let now = calendar.date(from: components) ?? Date()
+        let cutoff = MomentTimelineFetcher.pastWeekCutoff(now: now, calendar: calendar)
+
+        let container = try ModelContainer(
+            for: Moment.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        // Recent + unreflected → counted.
+        context.insert(Moment(timestamp: now, reflection: nil))
+        // Recent + empty-string reflection → counted (same "not reflected" arm).
+        context.insert(Moment(timestamp: cutoff, reflection: ""))
+        // Recent + reflected → excluded.
+        context.insert(Moment(timestamp: now, reflection: "grateful"))
+        // Just before the window + unreflected → excluded (aged out).
+        context.insert(Moment(timestamp: cutoff.addingTimeInterval(-1), reflection: nil))
+
+        let count = try context.fetchCount(
+            MomentTimelineFetcher.unreflectedRecentCountDescriptor(now: now, calendar: calendar)
+        )
+        #expect(count == 2)
+    }
+
     @Test("descriptorNewestPage uses the caller-supplied limit and no time bound")
     func descriptorNewestPageShape() {
         let descriptor = MomentTimelineFetcher.descriptorNewestPage(limit: 10)

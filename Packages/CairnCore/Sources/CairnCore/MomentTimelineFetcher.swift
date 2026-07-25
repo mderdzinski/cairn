@@ -103,6 +103,27 @@ public enum MomentTimelineFetcher {
         )
     }
 
+    /// Descriptor that counts unreflected moments **within the trailing 7-day
+    /// window** — the same `pastWeekCutoff` boundary the "this week" headline uses.
+    /// Bounding the "waiting for reflection" prompt to recent moments keeps it a
+    /// gentle, self-resolving invitation instead of an ever-growing all-time
+    /// backlog: older unreflected moments quietly age out of the count. They stay
+    /// reflectable inline (the row still offers "Add a reflection") — they're just
+    /// no longer surfaced by the banner, because a weeks-old feeling has gone cold.
+    ///
+    /// Same "not reflected" semantics as `unreflectedCountDescriptor`: `reflection`
+    /// is `nil` or empty (`ReflectSheet.save` normalizes whitespace-only to `nil`).
+    public static func unreflectedRecentCountDescriptor(
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> FetchDescriptor<Moment> {
+        let cutoff = pastWeekCutoff(now: now, calendar: calendar)
+        return FetchDescriptor<Moment>(
+            // swiftlint:disable:next empty_string
+            predicate: #Predicate { ($0.reflection == nil || $0.reflection == "") && $0.timestamp >= cutoff }
+        )
+    }
+
     /// Start-of-day 6 days before `now` — i.e. a 7-day inclusive window. Exposed so
     /// tests can pin the boundary without executing a fetch.
     public static func pastWeekCutoff(now: Date = .now, calendar: Calendar = .current) -> Date {
