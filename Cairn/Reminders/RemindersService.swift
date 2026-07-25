@@ -29,25 +29,31 @@ final class RemindersService: NSObject {
     /// same-day notice after one has already fired.
     private var lastRescheduleDay: Date?
     var lastDeepLinkURL: URL?
-    /// Non-nil when the most recent ``reschedule(settings:hasWaitingMoments:now:)``
-    /// call had at least one notification request fail to register. Cleared by the
-    /// next successful call.
+    /// Non-nil when the most recent reschedule had at least one notification
+    /// request fail to register. Cleared by the next successful call.
     var lastScheduleFailure: ScheduleFailure?
-    /// The `hasWaitingMoments` value the most recently completed reschedule
-    /// used. The data-change hook compares against this so only 0↔positive
-    /// transitions trigger a reschedule.
-    private(set) var lastScheduledHasWaiting: Bool?
+    /// The `waitingMomentTimestamp` the most recently completed reschedule
+    /// used. The data-change hook compares against this so only saves that
+    /// move the newest waiting moment trigger a reschedule.
+    private(set) var lastScheduledWaitingTimestamp: Date?
     /// The last known iOS notification authorization status. Updated by
     /// ``refreshAuthorizationStatus()``; views observe this to surface a "permission
     /// revoked in Settings" affordance without polling.
     var currentAuthorizationStatus: UNAuthorizationStatus = .notDetermined
 
     func requestAuthorization() async -> Bool {
+        let granted: Bool
         do {
-            return try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
-            return false
+            granted = false
         }
+        // Publish the outcome immediately — views and the didSave scheduling
+        // hook gate on the cached status, and waiting for the next scene
+        // activation to refresh it would leave a fresh grant invisible (the
+        // first capture after onboarding would silently skip scheduling).
+        await refreshAuthorizationStatus()
+        return granted
     }
 
     func authorizationStatus() async -> UNAuthorizationStatus {
@@ -63,7 +69,7 @@ final class RemindersService: NSObject {
 
     func reschedule(
         settings: RemindersSettings,
-        hasWaitingMoments: Bool,
+        waitingMomentTimestamp: Date?,
         scope: RemindersScheduler.Scope = .all,
         now: Date = .now
     ) async {
@@ -74,7 +80,7 @@ final class RemindersService: NSObject {
             await previous?.value
             await self?.performReschedule(
                 settings: settings,
-                hasWaitingMoments: hasWaitingMoments,
+                waitingMomentTimestamp: waitingMomentTimestamp,
                 scope: scope,
                 now: now,
                 generation: generation
@@ -91,11 +97,11 @@ final class RemindersService: NSObject {
     /// produce a second same-day notice. Settings edits call ``reschedule``
     /// with the full scope instead: the user changed the rules, so a full
     /// re-roll is the expected outcome.
-    func rescheduleIfStale(settings: RemindersSettings, hasWaitingMoments: Bool, now: Date = .now) async {
+    func rescheduleIfStale(settings: RemindersSettings, waitingMomentTimestamp: Date?, now: Date = .now) async {
         guard lastRescheduleDay != Calendar.current.startOfDay(for: now) else { return }
         await reschedule(
             settings: settings,
-            hasWaitingMoments: hasWaitingMoments,
+            waitingMomentTimestamp: waitingMomentTimestamp,
             scope: .futureNoticesAndReflect,
             now: now
         )
@@ -116,7 +122,7 @@ final class RemindersService: NSObject {
 
     private func performReschedule(
         settings: RemindersSettings,
-        hasWaitingMoments: Bool,
+        waitingMomentTimestamp: Date?,
         scope: RemindersScheduler.Scope,
         now: Date,
         generation: UInt64
@@ -137,7 +143,7 @@ final class RemindersService: NSObject {
         var random = SystemRandomNumberGenerator()
         let scheduled = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: hasWaitingMoments,
+            waitingMomentTimestamp: waitingMomentTimestamp,
             now: now,
             scope: scope,
             randomSource: &random
@@ -157,7 +163,7 @@ final class RemindersService: NSObject {
         lastScheduleFailure = failedCount > 0
             ? ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
             : nil
-        lastScheduledHasWaiting = hasWaitingMoments
+        lastScheduledWaitingTimestamp = waitingMomentTimestamp
         // Reflect-only reschedules don't refresh the notice horizon, so they
         // must not satisfy the daily top-up gate — a midnight capture would
         // otherwise suppress that day's notice top-up.

@@ -66,7 +66,7 @@ public enum RemindersScheduler {
 
     public static func compute(
         settings: RemindersSettings,
-        hasWaitingMoments: Bool,
+        waitingMomentTimestamp: Date?,
         now: Date,
         calendar: Calendar = .current,
         lookAheadDays: Int = defaultLookAheadDays,
@@ -85,10 +85,15 @@ public enum RemindersScheduler {
         }
         // Reflect fires are gated on there being something to reflect on —
         // "Only when moments are waiting" is a scheduling-time promise, since a
-        // local notification can't be suppressed at delivery time.
-        if settings.reflectEnabled, hasWaitingMoments {
+        // local notification can't be suppressed at delivery time. The caller
+        // passes the newest waiting moment's timestamp (nil for none) so each
+        // fire day can also be bounded by when that moment ages out of the
+        // trailing window — a snapshot boolean would leave fires standing for
+        // days after the last waiting moment went cold.
+        if settings.reflectEnabled, let waitingMomentTimestamp {
             out.append(contentsOf: reflectFires(
                 settings: settings,
+                waitingMomentTimestamp: waitingMomentTimestamp,
                 now: now,
                 calendar: calendar,
                 lookAheadDays: lookAheadDays
@@ -181,6 +186,7 @@ public enum RemindersScheduler {
 
     private static func reflectFires(
         settings: RemindersSettings,
+        waitingMomentTimestamp: Date,
         now: Date,
         calendar: Calendar,
         lookAheadDays: Int
@@ -189,7 +195,13 @@ public enum RemindersScheduler {
         for dayOffset in 0 ..< lookAheadDays {
             guard let referenceDay = calendar.date(byAdding: .day, value: dayOffset, to: now),
                   let fire = wallClockDate(minutes: settings.reflectTime, on: referenceDay, calendar: calendar),
-                  fire > now.addingTimeInterval(minimumLeadTime)
+                  fire > now.addingTimeInterval(minimumLeadTime),
+                  // Only while the qualifying moment is still inside the
+                  // trailing window on the fire's day — it ages out at a known
+                  // rollover, and a fire past that day would break the "only
+                  // when moments are waiting" promise. New captures extend the
+                  // bound via a fresh reschedule.
+                  waitingMomentTimestamp >= MomentTimelineFetcher.pastWeekCutoff(now: fire, calendar: calendar)
             else { continue }
             out.append(ScheduledReminder(
                 kind: .reflect,

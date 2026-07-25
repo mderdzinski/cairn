@@ -78,7 +78,7 @@ struct RemindersView: View {
             Task {
                 await remindersService.reschedule(
                     settings: decoded,
-                    hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                    waitingMomentTimestamp: MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
                 )
             }
         }
@@ -230,7 +230,7 @@ struct RemindersView: View {
                     Task {
                         await remindersService.reschedule(
                             settings: decoded,
-                            hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                            waitingMomentTimestamp: MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
                         )
                     }
                 }

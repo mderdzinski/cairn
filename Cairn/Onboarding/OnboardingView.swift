@@ -97,7 +97,7 @@ struct OnboardingView: View {
         if granted {
             await remindersService.reschedule(
                 settings: settings,
-                hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                waitingMomentTimestamp: MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
             )
         }
         finish()

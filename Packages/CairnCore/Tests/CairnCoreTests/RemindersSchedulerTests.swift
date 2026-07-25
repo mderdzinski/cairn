@@ -45,7 +45,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([42])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: at(6),
             now: at(6),
             calendar: calendar,
             randomSource: &random
@@ -59,7 +59,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([100, 200, 300, 400, 500])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             lookAheadDays: 1,
@@ -75,7 +75,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([60, 200, 400, 600, 700, 800, 100, 300, 500, 720])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             lookAheadDays: 3,
@@ -96,7 +96,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource(Array(60 ... 200).map { UInt64($0) })
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             lookAheadDays: 5,
@@ -113,7 +113,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([60, 130, 200, 400, 500, 600, 700, 800, 60, 720])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             randomSource: &random
@@ -136,7 +136,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([10, 200, 350, 470, 60, 380, 250])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             randomSource: &random
@@ -156,7 +156,7 @@ struct RemindersSchedulerTests {
         let now = at(6)
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: now,
             now: now,
             calendar: calendar,
             randomSource: &random
@@ -175,7 +175,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource(Array(0 ... 60).map { UInt64($0) })
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(20, 58),
             calendar: calendar,
             lookAheadDays: 1,
@@ -190,7 +190,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: at(10),
             now: at(10),
             calendar: calendar,
             randomSource: &random
@@ -213,7 +213,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: at(22),
             now: at(22),
             calendar: calendar,
             randomSource: &random
@@ -224,13 +224,48 @@ struct RemindersSchedulerTests {
         #expect(first.map { calendar.component(.day, from: $0.fireDate) } == 23)
     }
 
+    @Test("Reflect fires stop on the day the waiting moment ages out of the window")
+    func reflectBoundedByWaitingMomentAge() {
+        let settings = RemindersSettings(reflectEnabled: true, reflectTime: 20 * 60)
+        let now = at(10)
+
+        // Newest waiting moment on the window's trailing edge (captured six
+        // days ago): it ages out at tonight's rollover, so only today's fire
+        // may be scheduled — the other six look-ahead days would fire with
+        // nothing waiting.
+        let edgeDay = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+        let edgeMoment = calendar.date(byAdding: .hour, value: 12, to: edgeDay) ?? edgeDay
+        var random = FixedRandomSource([0])
+        let edgeResult = RemindersScheduler.compute(
+            settings: settings,
+            waitingMomentTimestamp: edgeMoment,
+            now: now,
+            calendar: calendar,
+            randomSource: &random
+        ).filter { $0.kind == .reflect }
+        #expect(edgeResult.count == 1)
+        #expect(edgeResult.first.map { calendar.component(.day, from: $0.fireDate) } == 22)
+
+        // A moment three days old stays in-window for four more fire days.
+        let midDay = calendar.date(byAdding: .day, value: -3, to: calendar.startOfDay(for: now)) ?? now
+        let midMoment = calendar.date(byAdding: .hour, value: 12, to: midDay) ?? midDay
+        let midResult = RemindersScheduler.compute(
+            settings: settings,
+            waitingMomentTimestamp: midMoment,
+            now: now,
+            calendar: calendar,
+            randomSource: &random
+        ).filter { $0.kind == .reflect }
+        #expect(midResult.count == 4)
+    }
+
     @Test("Reflect schedules nothing when no moments are waiting")
     func reflectGatedOnWaitingMoments() {
         let settings = RemindersSettings(noticeEnabled: true, reflectEnabled: true, freq: .once)
         var random = FixedRandomSource([100, 200, 300])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(10),
             calendar: calendar,
             randomSource: &random
@@ -246,7 +281,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([60, 200, 400, 600, 800])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: at(6),
             calendar: calendar,
             lookAheadDays: 3,
@@ -267,7 +302,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: at(10),
             now: at(10),
             calendar: calendar,
             randomSource: &random
@@ -298,7 +333,7 @@ struct RemindersSchedulerTests {
         var random = FixedRandomSource([60, 200, 400])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: at(10),
             now: at(10),
             calendar: calendar,
             scope: .reflectOnly,
@@ -316,7 +351,7 @@ struct RemindersSchedulerTests {
         let now = at(6)
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: now,
             now: now,
             calendar: calendar,
             scope: .futureNoticesAndReflect,
@@ -362,7 +397,7 @@ struct RemindersSchedulerDSTTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: now,
             now: now,
             calendar: calendar,
             randomSource: &random
@@ -384,7 +419,7 @@ struct RemindersSchedulerDSTTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: now,
             now: now,
             calendar: calendar,
             randomSource: &random
@@ -405,7 +440,7 @@ struct RemindersSchedulerDSTTests {
         var random = FixedRandomSource([0])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: true,
+            waitingMomentTimestamp: now,
             now: now,
             calendar: calendar,
             randomSource: &random
@@ -433,7 +468,7 @@ struct RemindersSchedulerDSTTests {
         var random = FixedRandomSource([10, 200, 350, 470, 60, 380, 250, 520, 700])
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: now,
             calendar: calendar,
             lookAheadDays: 3,
@@ -462,7 +497,7 @@ struct RemindersSchedulerDSTTests {
         var random = FixedRandomSource(Array(0 ... 59).map { UInt64($0) })
         let result = RemindersScheduler.compute(
             settings: settings,
-            hasWaitingMoments: false,
+            waitingMomentTimestamp: nil,
             now: now,
             calendar: calendar,
             lookAheadDays: 1,

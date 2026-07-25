@@ -77,8 +77,8 @@ struct MomentTimelineFetcherTests {
         #expect(fetched.map(\.id) == [target.id])
     }
 
-    @Test("hasUnreflectedRecentMoments mirrors the banner's window and reflection semantics")
-    func hasUnreflectedRecentMomentsSemantics() throws {
+    @Test("newestWaitingMomentTimestamp mirrors the banner's window and reflection semantics")
+    func newestWaitingMomentTimestampSemantics() throws {
         let calendar = Calendar(identifier: .gregorian)
         var components = DateComponents(year: 2026, month: 7, day: 4, hour: 10, minute: 30)
         components.calendar = calendar
@@ -90,19 +90,23 @@ struct MomentTimelineFetcherTests {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
-        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+        #expect(MomentTimelineFetcher.newestWaitingMomentTimestamp(in: context, now: now, calendar: calendar) == nil)
 
         // An unreflected moment older than the window doesn't count...
         context.insert(Moment(timestamp: cutoff.addingTimeInterval(-1), reflection: nil))
-        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+        #expect(MomentTimelineFetcher.newestWaitingMomentTimestamp(in: context, now: now, calendar: calendar) == nil)
 
         // ...a reflected recent one doesn't either...
         context.insert(Moment(timestamp: now, reflection: "grateful"))
-        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+        #expect(MomentTimelineFetcher.newestWaitingMomentTimestamp(in: context, now: now, calendar: calendar) == nil)
 
-        // ...but an unreflected recent one flips it.
-        context.insert(Moment(timestamp: now.addingTimeInterval(-60), reflection: nil))
-        #expect(MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+        // ...and of two unreflected recent moments, the newest one wins.
+        context.insert(Moment(timestamp: cutoff, reflection: nil))
+        let newest = now.addingTimeInterval(-60)
+        context.insert(Moment(timestamp: newest, reflection: nil))
+        #expect(
+            MomentTimelineFetcher.newestWaitingMomentTimestamp(in: context, now: now, calendar: calendar) == newest
+        )
     }
 
     @Test("unreflectedRecentCountDescriptor counts only unreflected moments inside the 7-day window")

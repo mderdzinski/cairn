@@ -57,7 +57,7 @@ struct RootTabView: View {
             if settings.anyEnabled {
                 await remindersService.reschedule(
                     settings: settings,
-                    hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                    waitingMomentTimestamp: MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
                 )
             }
         }
@@ -99,24 +99,25 @@ struct RootTabView: View {
         guard settings.anyEnabled, authorizedForScheduling else { return }
         await remindersService.rescheduleIfStale(
             settings: settings,
-            hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+            waitingMomentTimestamp: MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
         )
     }
 
-    /// Reschedule immediately when the "moments waiting for reflection" state
-    /// flips — edge-triggered, so ordinary saves cost one fetchCount and only
-    /// 0↔positive transitions touch the notification center. Bypasses the
-    /// once-per-day gate: a reflection that empties the queue must cancel
-    /// pending reflect fires now, not tomorrow. Reflect-scoped, because the
-    /// gate only affects reflect fires — a full rebuild here would re-roll
-    /// notices right after one fired (capturing in response to a notice is the
-    /// primary flow), producing a second same-day notice.
+    /// Reschedule immediately when the newest waiting-for-reflection moment
+    /// changes — edge-triggered on its timestamp, so saves that don't move it
+    /// cost one bounded fetch. A reflection that empties the queue cancels
+    /// pending reflect fires now (bypassing the once-per-day gate), and a new
+    /// capture extends the age-out bound the scheduler derived from the
+    /// previous newest moment. Reflect-scoped, because none of this affects
+    /// notice cadence — a full rebuild here would re-roll notices right after
+    /// one fired (capturing in response to a notice is the primary flow),
+    /// producing a second same-day notice.
     private func rescheduleIfWaitingChanged() async {
         let settings = RemindersSettings.decode(settingsData)
         guard settings.reflectEnabled, authorizedForScheduling else { return }
-        let waiting = MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
-        guard waiting != remindersService.lastScheduledHasWaiting else { return }
-        await remindersService.reschedule(settings: settings, hasWaitingMoments: waiting, scope: .reflectOnly)
+        let waiting = MomentTimelineFetcher.newestWaitingMomentTimestamp(in: modelContext)
+        guard waiting != remindersService.lastScheduledWaitingTimestamp else { return }
+        await remindersService.reschedule(settings: settings, waitingMomentTimestamp: waiting, scope: .reflectOnly)
     }
 
     private var authorizedForScheduling: Bool {

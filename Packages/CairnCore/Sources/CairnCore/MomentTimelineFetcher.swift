@@ -134,18 +134,26 @@ public enum MomentTimelineFetcher {
         return descriptor
     }
 
-    /// Whether any moment is currently "waiting for reflection" in the banner's
-    /// sense. Drives conditional reflect-reminder scheduling; the semantics must
-    /// stay identical to `unreflectedRecentCountDescriptor` so the reminder and
-    /// the banner never disagree. Fails open on a fetch error — a transient
-    /// store failure should cost at worst one unneeded nudge, not silently
-    /// disable a feature the user enabled.
-    public static func hasUnreflectedRecentMoments(
+    /// Timestamp of the newest moment "waiting for reflection" in the banner's
+    /// sense, or nil when none is. Drives conditional reflect-reminder
+    /// scheduling; the window and reflection semantics must stay identical to
+    /// `unreflectedRecentCountDescriptor` so the reminder and the banner never
+    /// disagree. The scheduler uses the timestamp — not a boolean — to stop
+    /// scheduling fires past the day this moment ages out of the window.
+    /// Fails open on a fetch error (returns `now`, as if a moment were just
+    /// captured) — a transient store failure should cost at worst a few
+    /// unneeded nudges, not silently disable a feature the user enabled.
+    public static func newestWaitingMomentTimestamp(
         in context: ModelContext,
         now: Date = .now,
         calendar: Calendar = .current
-    ) -> Bool {
-        ((try? context.fetchCount(unreflectedRecentCountDescriptor(now: now, calendar: calendar))) ?? 1) > 0
+    ) -> Date? {
+        do {
+            return try context.fetch(firstUnreflectedRecentDescriptor(now: now, calendar: calendar))
+                .first?.timestamp
+        } catch {
+            return now
+        }
     }
 
     /// Start-of-day 6 days before `now` — i.e. a 7-day inclusive window. Exposed so
