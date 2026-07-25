@@ -5,6 +5,7 @@ import SwiftUI
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncStatusMonitor.self) private var syncMonitor
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var moments: [Moment] = []
     /// Flips true when a page returns fewer than pageSize results — that's the only
@@ -70,6 +71,18 @@ struct TimelineView: View {
                 if previous != nil, current == nil {
                     refreshCounts()
                 }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // The week-bounded counts (headline and reflection banner) bake
+                // their cutoff in at fetch time, so they go stale when the day
+                // rolls over while Path stays mounted. Foregrounding after a
+                // suspend that crossed midnight won't have delivered
+                // NSCalendarDayChanged, so re-derive on every activation — same
+                // pattern as CaptureView's today count.
+                if phase == .active { refreshCounts() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                refreshCounts()
             }
             .task {
                 // Restore the liveness we lost by moving off @Query. Any save on
