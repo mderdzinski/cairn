@@ -4,11 +4,11 @@ import SwiftUI
 
 @main
 struct CairnWatchApp: App {
-    private let sharedModelContainer: ModelContainer = {
+    private let storeResult: MomentStoreResult = {
         do {
             return try MomentStore.makeContainer(
                 cloudKitContainerID: "iCloud.com.markderdzinski.Cairn"
-            ).container
+            )
         } catch {
             // Both CloudKit and local persistence failed — genuinely unrecoverable.
             fatalError("Failed to create Cairn ModelContainer: \(error)")
@@ -17,8 +17,8 @@ struct CairnWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchRootView()
+            WatchRootView(storeBacking: storeResult.backing)
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(storeResult.container)
     }
 }

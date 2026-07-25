@@ -1,4 +1,5 @@
 import CairnCore
+import os
 import SwiftData
 import SwiftUI
 import UIKit
@@ -12,6 +13,8 @@ struct CaptureView: View {
     @State private var lastCaptured: MomentCategory?
     @State private var toastTask: Task<Void, Never>?
     @State private var feedback = UIImpactFeedbackGenerator(style: .medium)
+
+    private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Capture")
 
     /// The boundary that defines "today" for the stone count. Held in state — not baked
     /// into a query at init — so it can be re-derived when the day rolls over while the
@@ -165,6 +168,14 @@ struct CaptureView: View {
     private func capture(_ category: MomentCategory) {
         feedback.impactOccurred()
         modelContext.insert(Moment(category: category))
+        do {
+            // Explicit save so a capture is durable at tap time (capture-and-
+            // pocket) and CloudKit export to the watch starts immediately,
+            // matching the watch app's capture path.
+            try modelContext.save()
+        } catch {
+            logger.error("Failed to save captured moment: \(error.localizedDescription)")
+        }
 
         toastTask?.cancel()
         MotionGate.animate(reduceMotion: reduceMotion, .easeOut(duration: 0.18)) {

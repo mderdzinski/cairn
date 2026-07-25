@@ -16,6 +16,7 @@ struct RootTabView: View {
     @AppStorage("cairn.hasSeenOnboarding") private var hasSeenOnboarding = false
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     @State private var selection: CairnTab = .capture
     let remindersService: RemindersService
     let storeBacking: MomentStoreBacking
@@ -54,7 +55,20 @@ struct RootTabView: View {
             await reconcileNotificationPermission()
             let settings = RemindersSettings.decode(settingsData)
             if settings.anyEnabled {
-                await remindersService.reschedule(settings: settings)
+                await remindersService.reschedule(
+                    settings: settings,
+                    hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                )
+            }
+        }
+        .task {
+            // Reflect fires are gated on moments waiting for reflection, so
+            // every data change that could flip that state — a capture, a
+            // reflection saved, a delete, or a CloudKit import of a watch
+            // capture — needs to recompute the gate. One didSave observer
+            // covers all four sources (same liveness pattern as TimelineView).
+            for await _ in NotificationCenter.default.notifications(named: ModelContext.didSave) {
+                await rescheduleIfWaitingChanged()
             }
         }
         .onChange(of: remindersService.lastDeepLinkURL) { _, url in
@@ -64,9 +78,49 @@ struct RootTabView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await reconcileNotificationPermission() }
+            Task {
+                // Reconcile first: it may flip the toggles off, and the
+                // reschedule below must see that.
+                await reconcileNotificationPermission()
+                await rescheduleOnForegroundIfNeeded()
+            }
         }
         .onOpenURL(perform: route(url:))
+    }
+
+    /// Top up the 7-day fire horizon on foreground, at most once per calendar
+    /// day. Notices are non-repeating with a bounded look-ahead; without this,
+    /// a user whose app is warm-resumed for over a week silently stops
+    /// receiving them. Daily (not every-foreground) because each reschedule
+    /// re-rolls today's remaining notice times — the scheduler doesn't know
+    /// what already fired, so frequent re-rolls risk duplicate same-day fires.
+    private func rescheduleOnForegroundIfNeeded() async {
+        let settings = RemindersSettings.decode(settingsData)
+        guard settings.anyEnabled, authorizedForScheduling else { return }
+        await remindersService.rescheduleIfStale(
+            settings: settings,
+            hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+        )
+    }
+
+    /// Reschedule immediately when the "moments waiting for reflection" state
+    /// flips — edge-triggered, so ordinary saves cost one fetchCount and only
+    /// 0↔positive transitions touch the notification center. Bypasses the
+    /// once-per-day gate: a reflection that empties the queue must cancel
+    /// pending reflect fires now, not tomorrow.
+    private func rescheduleIfWaitingChanged() async {
+        let settings = RemindersSettings.decode(settingsData)
+        guard settings.reflectEnabled, authorizedForScheduling else { return }
+        let waiting = MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+        guard waiting != remindersService.lastScheduledHasWaiting else { return }
+        await remindersService.reschedule(settings: settings, hasWaitingMoments: waiting)
+    }
+
+    private var authorizedForScheduling: Bool {
+        switch remindersService.currentAuthorizationStatus {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
     }
 
     /// On every foreground transition, re-check iOS notification permission. If the

@@ -41,10 +41,68 @@ struct MomentTimelineFetcherTests {
         #expect(MomentTimelineFetcher.defaultPageSize == 50)
     }
 
-    @Test("unreflectedCountDescriptor has no fetch limit — it counts the whole store")
-    func unreflectedCountDescriptorNoLimit() {
-        let descriptor = MomentTimelineFetcher.unreflectedCountDescriptor()
-        #expect(descriptor.fetchLimit == nil)
+    @Test("firstUnreflectedRecentDescriptor fetches a single row")
+    func firstUnreflectedRecentDescriptorLimit() {
+        let descriptor = MomentTimelineFetcher.firstUnreflectedRecentDescriptor()
+        #expect(descriptor.fetchLimit == 1)
+    }
+
+    @Test("firstUnreflectedRecentDescriptor returns the newest unreflected in-window moment")
+    func firstUnreflectedRecentDescriptorTarget() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents(year: 2026, month: 7, day: 4, hour: 10, minute: 30)
+        components.calendar = calendar
+        let now = calendar.date(from: components) ?? Date()
+        let cutoff = MomentTimelineFetcher.pastWeekCutoff(now: now, calendar: calendar)
+
+        let container = try ModelContainer(
+            for: Moment.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        // Newest moment is reflected → skipped.
+        context.insert(Moment(timestamp: now, reflection: "grateful"))
+        // The target: newest *unreflected* moment inside the window (empty
+        // string counts as unreflected, same arm as the count descriptor).
+        let target = Moment(timestamp: now.addingTimeInterval(-3600), reflection: "")
+        context.insert(target)
+        // Older unreflected in-window moment → not first.
+        context.insert(Moment(timestamp: cutoff, reflection: nil))
+        // Unreflected but aged out of the window → excluded entirely.
+        context.insert(Moment(timestamp: cutoff.addingTimeInterval(-1), reflection: nil))
+
+        let fetched = try context.fetch(
+            MomentTimelineFetcher.firstUnreflectedRecentDescriptor(now: now, calendar: calendar)
+        )
+        #expect(fetched.map(\.id) == [target.id])
+    }
+
+    @Test("hasUnreflectedRecentMoments mirrors the banner's window and reflection semantics")
+    func hasUnreflectedRecentMomentsSemantics() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents(year: 2026, month: 7, day: 4, hour: 10, minute: 30)
+        components.calendar = calendar
+        let now = calendar.date(from: components) ?? Date()
+        let cutoff = MomentTimelineFetcher.pastWeekCutoff(now: now, calendar: calendar)
+
+        let container = try ModelContainer(
+            for: Moment.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+
+        // An unreflected moment older than the window doesn't count...
+        context.insert(Moment(timestamp: cutoff.addingTimeInterval(-1), reflection: nil))
+        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+
+        // ...a reflected recent one doesn't either...
+        context.insert(Moment(timestamp: now, reflection: "grateful"))
+        #expect(!MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
+
+        // ...but an unreflected recent one flips it.
+        context.insert(Moment(timestamp: now.addingTimeInterval(-60), reflection: nil))
+        #expect(MomentTimelineFetcher.hasUnreflectedRecentMoments(in: context, now: now, calendar: calendar))
     }
 
     @Test("unreflectedRecentCountDescriptor counts only unreflected moments inside the 7-day window")

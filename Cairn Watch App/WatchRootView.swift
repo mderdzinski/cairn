@@ -1,4 +1,5 @@
 import CairnCore
+import os
 import SwiftData
 import SwiftUI
 import WatchKit
@@ -10,11 +11,15 @@ enum WatchScreen: Equatable {
 }
 
 struct WatchRootView: View {
+    var storeBacking: MomentStoreBacking = .cloud
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var screen: WatchScreen = .home
     @State private var dismissTask: Task<Void, Never>?
+
+    private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Capture")
 
     /// The boundary that defines "today" for the stone count. Held in state — not baked
     /// into a query at init — so it can be re-derived when the day rolls over. The watch
@@ -27,7 +32,7 @@ struct WatchRootView: View {
             switch screen {
             case .home:
                 TodayMomentsReader(dayStart: todayStart) { todayCount in
-                    WatchHomeView(todayCount: todayCount) {
+                    WatchHomeView(todayCount: todayCount, syncPaused: storeBacking == .local) {
                         MotionGate.animate(reduceMotion: reduceMotion, .easeInOut(duration: 0.2)) {
                             screen = .capture
                         }
@@ -76,6 +81,18 @@ struct WatchRootView: View {
     private func handleCapture(_ category: MomentCategory) {
         WKInterfaceDevice.current().play(.click)
         modelContext.insert(Moment(category: category))
+        do {
+            // Explicit save: the core gesture is capture-then-wrist-down, and
+            // watchOS can suspend the app before an autosave cycle runs —
+            // losing a moment the confirm screen already acknowledged. A
+            // committed save also lets CloudKit export to the phone start now
+            // instead of at the next launch.
+            try modelContext.save()
+        } catch {
+            // The moment is still in the context; autosave remains a second
+            // chance. Log rather than block the confirm flow.
+            logger.error("Failed to save captured moment: \(error.localizedDescription)")
+        }
         MotionGate.animate(reduceMotion: reduceMotion, .default) {
             screen = .confirm(category)
         }

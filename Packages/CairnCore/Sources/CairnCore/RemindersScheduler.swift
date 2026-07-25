@@ -19,21 +19,32 @@ public struct ScheduledReminder: Sendable, Hashable {
 
 public enum RemindersScheduler {
     public static let noticeIdentifierPrefix = "cairn.reminders.notice"
-    public static let reflectIdentifier = "cairn.reminders.reflect"
+    /// Reflect identifiers are `"\(reflectIdentifierPrefix).\(index)"`, one per
+    /// look-ahead day. The prefix value deliberately equals the bare identifier
+    /// the pre-1.0.1 repeating reflect request used, so a prefix match sweeps the
+    /// legacy request on the first cancel after update — migration for free.
+    public static let reflectIdentifierPrefix = "cairn.reminders.reflect"
 
     /// Minimum spacing between two notice fires on the same day.
     public static let minimumNoticeSpacing: TimeInterval = 60 * 60
 
-    /// Default look-ahead window for notice reminders. Schedules this many
+    /// Minimum lead time between `now` and any scheduled fire. Candidates are
+    /// whole minutes; one that's only seconds ahead can have its minute boundary
+    /// pass before the async notification-center add completes, in which case the
+    /// calendar trigger never matches and the fire is silently lost.
+    public static let minimumLeadTime: TimeInterval = 120
+
+    /// Default look-ahead window for reminder fires. Schedules this many
     /// days of fires up-front so the user can go ~a week without opening the
     /// app and still receive reminders.
-    public static let defaultNoticeLookAheadDays = 7
+    public static let defaultLookAheadDays = 7
 
     public static func compute(
         settings: RemindersSettings,
+        hasWaitingMoments: Bool,
         now: Date,
         calendar: Calendar = .current,
-        noticeLookAheadDays: Int = defaultNoticeLookAheadDays,
+        lookAheadDays: Int = defaultLookAheadDays,
         randomSource: inout some RandomNumberGenerator
     ) -> [ScheduledReminder] {
         var out: [ScheduledReminder] = []
@@ -42,16 +53,20 @@ public enum RemindersScheduler {
                 settings: settings,
                 now: now,
                 calendar: calendar,
-                lookAheadDays: noticeLookAheadDays,
+                lookAheadDays: lookAheadDays,
                 randomSource: &randomSource
             ))
         }
-        if settings.reflectEnabled, let reflectFire = reflectFire(
-            settings: settings,
-            now: now,
-            calendar: calendar
-        ) {
-            out.append(reflectFire)
+        // Reflect fires are gated on there being something to reflect on —
+        // "Only when moments are waiting" is a scheduling-time promise, since a
+        // local notification can't be suppressed at delivery time.
+        if settings.reflectEnabled, hasWaitingMoments {
+            out.append(contentsOf: reflectFires(
+                settings: settings,
+                now: now,
+                calendar: calendar,
+                lookAheadDays: lookAheadDays
+            ))
         }
         return out
     }
@@ -113,7 +128,7 @@ public enum RemindersScheduler {
                 calendar: context.calendar,
                 randomSource: &randomSource
             ),
-                candidate > context.now,
+                candidate > context.now.addingTimeInterval(minimumLeadTime),
                 dayFires.allSatisfy({ abs($0.timeIntervalSince(candidate)) >= minimumNoticeSpacing })
             else { continue }
             dayFires.append(candidate)
@@ -127,27 +142,62 @@ public enum RemindersScheduler {
         calendar: Calendar,
         randomSource: inout some RandomNumberGenerator
     ) -> Date? {
-        let startOfDay = calendar.startOfDay(for: referenceDay)
         let span = settings.activeHoursEnd - settings.activeHoursStart
         guard span > 0 else { return nil }
         let pick = Int.random(in: 0 ..< span, using: &randomSource)
         let minutes = settings.activeHoursStart + pick
-        return calendar.date(byAdding: .minute, value: minutes, to: startOfDay)
+        guard let candidate = wallClockDate(minutes: minutes, on: referenceDay, calendar: calendar),
+              isWithinActiveHours(candidate, settings: settings, calendar: calendar)
+        else { return nil }
+        return candidate
     }
 
-    private static func reflectFire(
+    private static func reflectFires(
         settings: RemindersSettings,
         now: Date,
+        calendar: Calendar,
+        lookAheadDays: Int
+    ) -> [ScheduledReminder] {
+        var fires: [Date] = []
+        for dayOffset in 0 ..< lookAheadDays {
+            guard let referenceDay = calendar.date(byAdding: .day, value: dayOffset, to: now),
+                  let fire = wallClockDate(minutes: settings.reflectTime, on: referenceDay, calendar: calendar),
+                  fire > now.addingTimeInterval(minimumLeadTime)
+            else { continue }
+            fires.append(fire)
+        }
+        return fires.sorted().enumerated().map { index, date in
+            ScheduledReminder(
+                kind: .reflect,
+                fireDate: date,
+                identifier: "\(reflectIdentifierPrefix).\(index)"
+            )
+        }
+    }
+
+    /// Resolve minutes-since-midnight to a wall-clock instant on `day`.
+    ///
+    /// Setting hour/minute components — rather than adding elapsed minutes to
+    /// `startOfDay` — is what keeps fires at the user's chosen wall-clock time
+    /// across DST transitions (a 23- or 25-hour day makes elapsed-minute math
+    /// land an hour off). A time that doesn't exist on `day` (inside the
+    /// spring-forward gap) resolves forward to the first valid instant, matching
+    /// the iOS alarm convention: slightly late beats never.
+    private static func wallClockDate(minutes: Int, on day: Date, calendar: Calendar) -> Date? {
+        let (hour, minute) = RemindersSettings.hourMinute(from: minutes)
+        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)
+    }
+
+    /// A gap-shifted candidate can resolve past the active window (e.g. a window
+    /// that sits entirely inside the spring-forward gap); re-validate in
+    /// wall-clock space so the "never outside active hours" invariant holds.
+    private static func isWithinActiveHours(
+        _ date: Date,
+        settings: RemindersSettings,
         calendar: Calendar
-    ) -> ScheduledReminder? {
-        let (hour, minute) = RemindersSettings.hourMinute(from: settings.reflectTime)
-        let startOfToday = calendar.startOfDay(for: now)
-        guard var fire = calendar.date(byAdding: .minute, value: hour * 60 + minute, to: startOfToday) else {
-            return nil
-        }
-        if fire <= now, let tomorrow = calendar.date(byAdding: .day, value: 1, to: fire) {
-            fire = tomorrow
-        }
-        return ScheduledReminder(kind: .reflect, fireDate: fire, identifier: reflectIdentifier)
+    ) -> Bool {
+        let minutes = calendar.component(.hour, from: date) * 60
+            + calendar.component(.minute, from: date)
+        return minutes >= settings.activeHoursStart && minutes < settings.activeHoursEnd
     }
 }

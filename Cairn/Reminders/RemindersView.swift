@@ -21,6 +21,7 @@ struct RemindersView: View {
     @Environment(RemindersService.self) private var remindersService
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var modelContext
     @State private var expandedRow: ExpandedRow?
     @State private var pendingToggle: PendingToggle?
     @State private var isPriming = false
@@ -74,7 +75,12 @@ struct RemindersView: View {
         }
         .onChange(of: settingsData) { _, newValue in
             let decoded = RemindersSettings.decode(newValue)
-            Task { await remindersService.reschedule(settings: decoded) }
+            Task {
+                await remindersService.reschedule(
+                    settings: decoded,
+                    hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                )
+            }
         }
         .alert("Notifications are off in Settings", isPresented: $showsDeniedAlert) {
             Button("Open Settings") {
@@ -221,7 +227,12 @@ struct RemindersView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Retry") {
                     let decoded = RemindersSettings.decode(settingsData)
-                    Task { await remindersService.reschedule(settings: decoded) }
+                    Task {
+                        await remindersService.reschedule(
+                            settings: decoded,
+                            hasWaitingMoments: MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
+                        )
+                    }
                 }
                 .font(.cairnLabel.weight(.medium))
                 .foregroundStyle(Color.cairnAccentInk)
@@ -275,7 +286,7 @@ struct RemindersView: View {
             ReminderCardHead(
                 systemImage: "pencil",
                 title: "Reflection reminders",
-                subtitle: "A daily nudge to come back and reflect",
+                subtitle: "A nudge to reflect when moments are waiting",
                 isOn: toggleBinding(for: .reflect)
             )
             if settings.wrappedValue.reflectEnabled {
@@ -329,7 +340,7 @@ struct RemindersView: View {
     }
 
     private var reflectHelperText: String {
-        "A daily nudge at your chosen time."
+        "Arrives at your chosen time, only when recent moments are waiting."
     }
 
     private var reflectPreviewBody: String {

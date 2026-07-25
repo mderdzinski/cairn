@@ -17,10 +17,26 @@ final class RemindersService: NSObject {
     private let center = UNUserNotificationCenter.current()
     private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Reminders")
     private var rescheduleGeneration: UInt64 = 0
+    /// FIFO chain over every notification-center mutation. Each queued block
+    /// awaits its predecessor before touching the center, so a full
+    /// cancel + compute + add cycle is atomic per call: a stale cancel can
+    /// never resume in the middle of a newer call's adds, and a newer call's
+    /// pending-requests snapshot always includes every earlier in-flight add.
+    private var pipeline: Task<Void, Never>?
+    /// Start-of-day of the last reschedule that ran to completion. Gates the
+    /// foreground top-up to once per calendar day — the scheduler is
+    /// delivery-unaware, so re-rolling candidates more often risks a second
+    /// same-day notice after one has already fired.
+    private var lastRescheduleDay: Date?
     var lastDeepLinkURL: URL?
-    /// Non-nil when the most recent ``reschedule(settings:now:)`` call had at least one
-    /// notification request fail to register. Cleared by the next successful call.
+    /// Non-nil when the most recent ``reschedule(settings:hasWaitingMoments:now:)``
+    /// call had at least one notification request fail to register. Cleared by the
+    /// next successful call.
     var lastScheduleFailure: ScheduleFailure?
+    /// The `hasWaitingMoments` value the most recently completed reschedule
+    /// used. The data-change hook compares against this so only 0↔positive
+    /// transitions trigger a reschedule.
+    private(set) var lastScheduledHasWaiting: Bool?
     /// The last known iOS notification authorization status. Updated by
     /// ``refreshAuthorizationStatus()``; views observe this to surface a "permission
     /// revoked in Settings" affordance without polling.
@@ -45,14 +61,58 @@ final class RemindersService: NSObject {
         currentAuthorizationStatus = await authorizationStatus()
     }
 
-    func reschedule(settings: RemindersSettings, now: Date = .now) async {
+    func reschedule(settings: RemindersSettings, hasWaitingMoments: Bool, now: Date = .now) async {
         rescheduleGeneration &+= 1
         let generation = rescheduleGeneration
+        let previous = pipeline
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.performReschedule(
+                settings: settings,
+                hasWaitingMoments: hasWaitingMoments,
+                now: now,
+                generation: generation
+            )
+        }
+        pipeline = task
+        await task.value
+    }
 
-        await cancelAll()
-        // A newer call landed while we awaited cancel — bail before
-        // re-adding stale requests on top of the newer batch's work.
+    /// Reschedule at most once per calendar day. The foreground top-up path
+    /// uses this; settings edits and waiting-state flips call ``reschedule``
+    /// directly so they always take effect immediately.
+    func rescheduleIfStale(settings: RemindersSettings, hasWaitingMoments: Bool, now: Date = .now) async {
+        guard lastRescheduleDay != Calendar.current.startOfDay(for: now) else { return }
+        await reschedule(settings: settings, hasWaitingMoments: hasWaitingMoments, now: now)
+    }
+
+    func cancelAll() async {
+        // Joins the same FIFO chain as reschedules: a direct cancel (permission
+        // revoked) must not interleave with a queued reschedule's add loop.
+        rescheduleGeneration &+= 1
+        let previous = pipeline
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.performCancelAll()
+        }
+        pipeline = task
+        await task.value
+    }
+
+    private func performReschedule(
+        settings: RemindersSettings,
+        hasWaitingMoments: Bool,
+        now: Date,
+        generation: UInt64
+    ) async {
+        // Superseded while queued — the newest queued call redoes cancel+add
+        // from scratch, so skip the redundant churn entirely. Execution is
+        // strictly serial past this point; no further generation checks needed.
         guard generation == rescheduleGeneration else { return }
+
+        // Must be the raw body, not cancelAll() — enqueueing from inside the
+        // chain and awaiting it would deadlock behind this very block.
+        await performCancelAll()
         guard settings.anyEnabled else {
             lastScheduleFailure = nil
             return
@@ -61,13 +121,13 @@ final class RemindersService: NSObject {
         var random = SystemRandomNumberGenerator()
         let scheduled = RemindersScheduler.compute(
             settings: settings,
+            hasWaitingMoments: hasWaitingMoments,
             now: now,
             randomSource: &random
         )
 
         var failedCount = 0
         for reminder in scheduled {
-            guard generation == rescheduleGeneration else { return }
             let request = makeRequest(reminder: reminder)
             do {
                 try await center.add(request)
@@ -77,15 +137,14 @@ final class RemindersService: NSObject {
             }
         }
 
-        // Only publish the final tally for the latest generation — a newer call
-        // that landed mid-loop will own this state when it finishes.
-        guard generation == rescheduleGeneration else { return }
         lastScheduleFailure = failedCount > 0
             ? ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
             : nil
+        lastScheduledHasWaiting = hasWaitingMoments
+        lastRescheduleDay = Calendar.current.startOfDay(for: .now)
     }
 
-    func cancelAll() async {
+    private func performCancelAll() async {
         let identifiers = await pendingCairnIdentifiers()
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
@@ -94,8 +153,10 @@ final class RemindersService: NSObject {
         await center.pendingNotificationRequests()
             .map(\.identifier)
             .filter {
+                // Prefix matching on reflect also sweeps the bare legacy
+                // identifier the pre-conditional repeating request used.
                 $0.hasPrefix(RemindersScheduler.noticeIdentifierPrefix)
-                    || $0 == RemindersScheduler.reflectIdentifier
+                    || $0.hasPrefix(RemindersScheduler.reflectIdentifierPrefix)
             }
     }
 
@@ -107,27 +168,21 @@ final class RemindersService: NSObject {
             content.body = "What are you noticing right now?"
             content.userInfo = ["cairn.deeplink": "cairn://capture"]
         case .reflect:
-            // Stable copy across deliveries because the trigger repeats.
-            // Counts would otherwise go stale day-to-day.
             content.body = "A quiet moment to revisit your path."
             content.userInfo = ["cairn.deeplink": "cairn://path"]
         }
         content.sound = .default
 
-        let trigger = makeTrigger(for: reminder)
+        // Both kinds are non-repeating full-date triggers. Reflect fires are
+        // scheduled per look-ahead day and gated on moments actually waiting —
+        // a local notification can't be suppressed at delivery time, so the
+        // "only when moments are waiting" promise is kept at scheduling time.
+        let components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: reminder.fireDate
+        )
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         return UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger)
-    }
-
-    private func makeTrigger(for reminder: ScheduledReminder) -> UNNotificationTrigger {
-        let calendar = Calendar.current
-        switch reminder.kind {
-        case .notice:
-            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fireDate)
-            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        case .reflect:
-            let components = calendar.dateComponents([.hour, .minute], from: reminder.fireDate)
-            return UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        }
     }
 }
 
@@ -137,11 +192,6 @@ extension RemindersService: UNUserNotificationCenterDelegate {
         willPresent _: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // Reflect reminders fire daily regardless of pending count — see
-        // RemindersView's helper copy. A future PR with a
-        // UNNotificationServiceExtension could gate background delivery
-        // on the live pending count; until then the trigger is daily and
-        // foreground delivery behaves the same.
         completionHandler([.banner, .sound])
     }
 
