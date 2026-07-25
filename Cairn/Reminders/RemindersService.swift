@@ -61,7 +61,12 @@ final class RemindersService: NSObject {
         currentAuthorizationStatus = await authorizationStatus()
     }
 
-    func reschedule(settings: RemindersSettings, hasWaitingMoments: Bool, now: Date = .now) async {
+    func reschedule(
+        settings: RemindersSettings,
+        hasWaitingMoments: Bool,
+        scope: RemindersScheduler.Scope = .all,
+        now: Date = .now
+    ) async {
         rescheduleGeneration &+= 1
         let generation = rescheduleGeneration
         let previous = pipeline
@@ -70,6 +75,7 @@ final class RemindersService: NSObject {
             await self?.performReschedule(
                 settings: settings,
                 hasWaitingMoments: hasWaitingMoments,
+                scope: scope,
                 now: now,
                 generation: generation
             )
@@ -78,12 +84,21 @@ final class RemindersService: NSObject {
         await task.value
     }
 
-    /// Reschedule at most once per calendar day. The foreground top-up path
-    /// uses this; settings edits and waiting-state flips call ``reschedule``
-    /// directly so they always take effect immediately.
+    /// Top up the fire horizon at most once per calendar day, preserving
+    /// today's pending notices. Yesterday's batch always covered today, so
+    /// today's notices are either still pending (kept as-is) or already fired
+    /// (and nothing new is added for today) — either way a rebuild can't
+    /// produce a second same-day notice. Settings edits call ``reschedule``
+    /// with the full scope instead: the user changed the rules, so a full
+    /// re-roll is the expected outcome.
     func rescheduleIfStale(settings: RemindersSettings, hasWaitingMoments: Bool, now: Date = .now) async {
         guard lastRescheduleDay != Calendar.current.startOfDay(for: now) else { return }
-        await reschedule(settings: settings, hasWaitingMoments: hasWaitingMoments, now: now)
+        await reschedule(
+            settings: settings,
+            hasWaitingMoments: hasWaitingMoments,
+            scope: .futureNoticesAndReflect,
+            now: now
+        )
     }
 
     func cancelAll() async {
@@ -102,6 +117,7 @@ final class RemindersService: NSObject {
     private func performReschedule(
         settings: RemindersSettings,
         hasWaitingMoments: Bool,
+        scope: RemindersScheduler.Scope,
         now: Date,
         generation: UInt64
     ) async {
@@ -112,7 +128,7 @@ final class RemindersService: NSObject {
 
         // Must be the raw body, not cancelAll() — enqueueing from inside the
         // chain and awaiting it would deadlock behind this very block.
-        await performCancelAll()
+        await performCancel(scope: scope, now: now)
         guard settings.anyEnabled else {
             lastScheduleFailure = nil
             return
@@ -123,6 +139,7 @@ final class RemindersService: NSObject {
             settings: settings,
             hasWaitingMoments: hasWaitingMoments,
             now: now,
+            scope: scope,
             randomSource: &random
         )
 
@@ -141,23 +158,47 @@ final class RemindersService: NSObject {
             ? ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
             : nil
         lastScheduledHasWaiting = hasWaitingMoments
-        lastRescheduleDay = Calendar.current.startOfDay(for: .now)
+        // Reflect-only reschedules don't refresh the notice horizon, so they
+        // must not satisfy the daily top-up gate — a midnight capture would
+        // otherwise suppress that day's notice top-up.
+        if scope != .reflectOnly {
+            lastRescheduleDay = Calendar.current.startOfDay(for: .now)
+        }
     }
 
     private func performCancelAll() async {
-        let identifiers = await pendingCairnIdentifiers()
-        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        await performCancel(scope: .all, now: .now)
     }
 
-    private func pendingCairnIdentifiers() async -> [String] {
-        await center.pendingNotificationRequests()
-            .map(\.identifier)
-            .filter {
-                // Prefix matching on reflect also sweeps the bare legacy
-                // identifier the pre-conditional repeating request used.
-                $0.hasPrefix(RemindersScheduler.noticeIdentifierPrefix)
-                    || $0.hasPrefix(RemindersScheduler.reflectIdentifierPrefix)
+    /// Remove exactly the pending requests the paired compute scope will
+    /// regenerate — nothing more. In particular, `.futureNoticesAndReflect`
+    /// leaves today's day-keyed notices in place so a top-up can never re-roll
+    /// a notice for a day whose fire may already have been delivered.
+    private func performCancel(scope: RemindersScheduler.Scope, now: Date) async {
+        let pending = await center.pendingNotificationRequests().map(\.identifier)
+        let toRemove: [String]
+        switch scope {
+        case .all:
+            toRemove = pending.filter { isCairnIdentifier($0) }
+        case .reflectOnly:
+            toRemove = pending.filter { $0.hasPrefix(RemindersScheduler.reflectIdentifierPrefix) }
+        case .futureNoticesAndReflect:
+            let today = RemindersScheduler.dayKey(for: now, calendar: Calendar.current)
+            toRemove = pending.filter { identifier in
+                guard isCairnIdentifier(identifier) else { return false }
+                // Keep only today's day-keyed notices; legacy batch-indexed
+                // identifiers parse to nil and are swept as stale.
+                return RemindersScheduler.noticeIdentifierDayKey(identifier) != today
             }
+        }
+        center.removePendingNotificationRequests(withIdentifiers: toRemove)
+    }
+
+    private func isCairnIdentifier(_ identifier: String) -> Bool {
+        // Prefix matching on reflect also sweeps the bare legacy identifier
+        // the pre-conditional repeating request used.
+        identifier.hasPrefix(RemindersScheduler.noticeIdentifierPrefix)
+            || identifier.hasPrefix(RemindersScheduler.reflectIdentifierPrefix)
     }
 
     private func makeRequest(reminder: ScheduledReminder) -> UNNotificationRequest {

@@ -107,13 +107,16 @@ struct RootTabView: View {
     /// flips — edge-triggered, so ordinary saves cost one fetchCount and only
     /// 0↔positive transitions touch the notification center. Bypasses the
     /// once-per-day gate: a reflection that empties the queue must cancel
-    /// pending reflect fires now, not tomorrow.
+    /// pending reflect fires now, not tomorrow. Reflect-scoped, because the
+    /// gate only affects reflect fires — a full rebuild here would re-roll
+    /// notices right after one fired (capturing in response to a notice is the
+    /// primary flow), producing a second same-day notice.
     private func rescheduleIfWaitingChanged() async {
         let settings = RemindersSettings.decode(settingsData)
         guard settings.reflectEnabled, authorizedForScheduling else { return }
         let waiting = MomentTimelineFetcher.hasUnreflectedRecentMoments(in: modelContext)
         guard waiting != remindersService.lastScheduledHasWaiting else { return }
-        await remindersService.reschedule(settings: settings, hasWaitingMoments: waiting)
+        await remindersService.reschedule(settings: settings, hasWaitingMoments: waiting, scope: .reflectOnly)
     }
 
     private var authorizedForScheduling: Bool {

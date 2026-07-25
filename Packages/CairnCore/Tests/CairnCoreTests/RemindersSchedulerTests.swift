@@ -240,7 +240,7 @@ struct RemindersSchedulerTests {
         #expect(!result.filter { $0.kind == .notice }.isEmpty)
     }
 
-    @Test("Notice fires use the namespaced identifier prefix")
+    @Test("Notice identifiers embed the fire date's day key")
     func noticeIdentifiers() {
         let settings = RemindersSettings(noticeEnabled: true, freq: .few)
         var random = FixedRandomSource([60, 200, 400, 600, 800])
@@ -249,15 +249,19 @@ struct RemindersSchedulerTests {
             hasWaitingMoments: false,
             now: at(6),
             calendar: calendar,
+            lookAheadDays: 3,
             randomSource: &random
         )
         let notices = result.filter { $0.kind == .notice }
         for reminder in notices {
             #expect(reminder.identifier.hasPrefix(RemindersScheduler.noticeIdentifierPrefix))
+            let expectedKey = RemindersScheduler.dayKey(for: reminder.fireDate, calendar: calendar)
+            #expect(RemindersScheduler.noticeIdentifierDayKey(reminder.identifier) == expectedKey)
         }
+        #expect(Set(notices.map(\.identifier)).count == notices.count)
     }
 
-    @Test("Reflect fires use distinct namespaced identifiers")
+    @Test("Reflect identifiers are one day-keyed identifier per fire")
     func reflectIdentifiers() {
         let settings = RemindersSettings(reflectEnabled: true)
         var random = FixedRandomSource([0])
@@ -270,9 +274,65 @@ struct RemindersSchedulerTests {
         )
         let reflects = result.filter { $0.kind == .reflect }
         for reminder in reflects {
-            #expect(reminder.identifier.hasPrefix(RemindersScheduler.reflectIdentifierPrefix))
+            let expectedKey = RemindersScheduler.dayKey(for: reminder.fireDate, calendar: calendar)
+            #expect(reminder.identifier == "\(RemindersScheduler.reflectIdentifierPrefix).\(expectedKey)")
         }
         #expect(Set(reflects.map(\.identifier)).count == reflects.count)
+    }
+
+    @Test("noticeIdentifierDayKey parses day-scoped identifiers and rejects legacy ones")
+    func noticeIdentifierDayKeyParsing() {
+        let prefix = RemindersScheduler.noticeIdentifierPrefix
+        #expect(RemindersScheduler.noticeIdentifierDayKey("\(prefix).20260622.2") == "20260622")
+        // Legacy batch-indexed identifier from the previous release — stale format.
+        #expect(RemindersScheduler.noticeIdentifierDayKey("\(prefix).3") == nil)
+        #expect(RemindersScheduler.noticeIdentifierDayKey(prefix) == nil)
+        // Reflect identifiers are not notice identifiers.
+        #expect(RemindersScheduler
+            .noticeIdentifierDayKey("\(RemindersScheduler.reflectIdentifierPrefix).20260622") == nil)
+    }
+
+    @Test("reflectOnly scope computes no notices even when notices are enabled")
+    func reflectOnlyScopeSkipsNotices() {
+        let settings = RemindersSettings(noticeEnabled: true, reflectEnabled: true, freq: .few)
+        var random = FixedRandomSource([60, 200, 400])
+        let result = RemindersScheduler.compute(
+            settings: settings,
+            hasWaitingMoments: true,
+            now: at(10),
+            calendar: calendar,
+            scope: .reflectOnly,
+            randomSource: &random
+        )
+        #expect(result.filter { $0.kind == .notice }.isEmpty)
+        // 10:00 is before the default 20:00 reflect time, so day 0 still counts.
+        #expect(result.filter { $0.kind == .reflect }.count == RemindersScheduler.defaultLookAheadDays)
+    }
+
+    @Test("futureNoticesAndReflect scope schedules no notices for today")
+    func topUpScopePreservesToday() {
+        let settings = RemindersSettings(noticeEnabled: true, reflectEnabled: true, freq: .few)
+        var random = FixedRandomSource([60, 200, 400, 600, 800, 100, 300])
+        let now = at(6)
+        let result = RemindersScheduler.compute(
+            settings: settings,
+            hasWaitingMoments: true,
+            now: now,
+            calendar: calendar,
+            scope: .futureNoticesAndReflect,
+            randomSource: &random
+        )
+        let today = calendar.startOfDay(for: now)
+        let notices = result.filter { $0.kind == .notice }
+        #expect(!notices.isEmpty)
+        for reminder in notices {
+            #expect(calendar.startOfDay(for: reminder.fireDate) > today)
+        }
+        // Reflect still covers today — a fixed-time fire that already passed
+        // self-skips, so it can't double-fire the way a re-rolled notice can.
+        let reflectDays = Set(result.filter { $0.kind == .reflect }
+            .map { calendar.startOfDay(for: $0.fireDate) })
+        #expect(reflectDays.contains(today))
     }
 }
 
