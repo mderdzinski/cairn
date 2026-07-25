@@ -160,9 +160,16 @@ final class RemindersService: NSObject {
             }
         }
 
-        lastScheduleFailure = failedCount > 0
-            ? ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
-            : nil
+        if failedCount > 0 {
+            lastScheduleFailure = ScheduleFailure(failedCount: failedCount, totalCount: scheduled.count)
+        } else if scope == .all {
+            // Only a full rebuild proves the whole schedule is healthy. A
+            // scoped success (reflect-only after a capture, the daily top-up)
+            // doesn't retry the untouched scope's failed requests, so clearing
+            // here would hide the retry affordance while notices are still
+            // missing.
+            lastScheduleFailure = nil
+        }
         lastScheduledWaitingTimestamp = waitingMomentTimestamp
         // Reflect-only reschedules don't refresh the notice horizon, so they
         // must not satisfy the daily top-up gate — a midnight capture would
