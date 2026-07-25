@@ -99,10 +99,17 @@ final class RemindersService: NSObject {
     /// re-roll is the expected outcome.
     func rescheduleIfStale(settings: RemindersSettings, waitingMomentTimestamp: Date?, now: Date = .now) async {
         guard lastRescheduleDay != Calendar.current.startOfDay(for: now) else { return }
+        // First completed reschedule of this process: the launch pass either
+        // ran (setting lastRescheduleDay) or was skipped because everything
+        // was disabled — in which case nothing is pending and nothing fired
+        // today, so preserving "today" would only leave the first enabled day
+        // (e.g. reminders turned on via the onboarding denied → iOS Settings
+        // path) with no notices. Full scope is both safe and complete there.
+        let scope: RemindersScheduler.Scope = lastRescheduleDay == nil ? .all : .futureNoticesAndReflect
         await reschedule(
             settings: settings,
             waitingMomentTimestamp: waitingMomentTimestamp,
-            scope: .futureNoticesAndReflect,
+            scope: scope,
             now: now
         )
     }

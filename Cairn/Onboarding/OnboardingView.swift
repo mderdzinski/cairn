@@ -77,10 +77,17 @@ struct OnboardingView: View {
     private func allowReminders(notice: Bool, reflect: Bool) async {
         // Permission already denied in iOS Settings: requestAuthorization would
         // return false with no prompt, silently granting nothing the user just
-        // asked for. Surface it; finish() moves to the alert's buttons.
+        // asked for. Surface it; finish() moves to the alert's buttons. The
+        // requested toggles are persisted too — if the user grants permission
+        // in iOS Settings, the next foreground reconcile finds them enabled
+        // and schedules; if they don't, the same reconcile flips them back off.
         let status = await remindersService.authorizationStatus()
         if status == .denied {
-            persistPrimedPermission()
+            var settings = RemindersSettings.decode(settingsData)
+            settings.hasPrimedPermission = true
+            settings.noticeEnabled = notice
+            settings.reflectEnabled = reflect
+            settingsData = RemindersSettings.encode(settings)
             showsDeniedAlert = true
             return
         }
@@ -101,12 +108,6 @@ struct OnboardingView: View {
             )
         }
         finish()
-    }
-
-    private func persistPrimedPermission() {
-        var settings = RemindersSettings.decode(settingsData)
-        settings.hasPrimedPermission = true
-        settingsData = RemindersSettings.encode(settings)
     }
 }
 
