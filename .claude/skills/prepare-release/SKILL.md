@@ -137,18 +137,20 @@ git diff <from-tag>..<until-tag> -- \
 
 ### Step 10: Write the notes
 
-Use exactly this section structure (omit any section that would be empty):
+Use exactly this section structure (omit any section that would be empty). The line under the title records the range for anyone reading the file later; drop it when pasting into App Store Connect.
 
 ```
-## Cairn <until-tag>
+# Cairn <until-tag>
 
-### New
+Everything shipped since <from-tag>.
+
+## New
 * <list>
 
-### Improvements
+## Improvements
 * <list>
 
-### Fixes
+## Fixes
 * <list>
 ```
 
