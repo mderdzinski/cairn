@@ -99,6 +99,7 @@ First, read the combined net diff for the entire range, excluding tests, CI, lin
 git diff <from-tag>..<until-tag> -- \
   ':(exclude)CairnTests' ':(exclude)CairnUITests' \
   ':(exclude)Cairn Watch AppTests' ':(exclude)Cairn Watch AppUITests' \
+  ':(exclude)Packages/CairnCore/Tests' \
   ':(exclude).github' ':(exclude)*.pbxproj' \
   ':(exclude).swiftformat' ':(exclude).swiftlint.yml' \
   ':(exclude)lefthook.yml' ':(exclude)*.md' ':(exclude).releaserc.json'
