@@ -37,6 +37,17 @@ public enum RemindersScheduler {
         /// today's notices are either still pending (callers preserve them) or
         /// already fired (nothing new may be added for today either way).
         case futureNoticesAndReflect
+
+        /// Whether a reschedule at this scope regenerates everything a
+        /// reschedule at `other` would. Drives supersession: a queued call may
+        /// be skipped only when a newer call's scope covers it.
+        public func covers(_ other: Scope) -> Bool {
+            switch self {
+            case .all: true
+            case .futureNoticesAndReflect: other != .all
+            case .reflectOnly: other == .reflectOnly
+            }
+        }
     }
 
     /// Notice identifiers are `"\(noticeIdentifierPrefix).\(dayKey).\(index)"` —

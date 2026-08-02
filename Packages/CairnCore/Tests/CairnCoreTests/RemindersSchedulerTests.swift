@@ -82,8 +82,10 @@ struct RemindersSchedulerTests {
             randomSource: &random
         )
         let notices = result.filter { $0.kind == .notice }
-        // Three days × three-per-day cap
+        // Three days × three-per-day cap; the lower bound guards against a
+        // regression that silently computes nothing.
         #expect(notices.count <= 9)
+        #expect(!notices.isEmpty)
         let perDay = Dictionary(grouping: notices) { calendar.startOfDay(for: $0.fireDate) }
         for (_, dayFires) in perDay {
             #expect(dayFires.count <= 3)
@@ -313,6 +315,23 @@ struct RemindersSchedulerTests {
             #expect(reminder.identifier == "\(RemindersScheduler.reflectIdentifierPrefix).\(expectedKey)")
         }
         #expect(Set(reflects.map(\.identifier)).count == reflects.count)
+    }
+
+    @Test("Scope.covers reflects what each scope actually regenerates")
+    func scopeCoversRelation() {
+        // .all redoes everything; a queued call of any scope may be skipped.
+        #expect(RemindersScheduler.Scope.all.covers(.all))
+        #expect(RemindersScheduler.Scope.all.covers(.futureNoticesAndReflect))
+        #expect(RemindersScheduler.Scope.all.covers(.reflectOnly))
+        // The top-up redoes future notices + reflect, but not today's notices —
+        // it must never swallow a queued full rebuild.
+        #expect(!RemindersScheduler.Scope.futureNoticesAndReflect.covers(.all))
+        #expect(RemindersScheduler.Scope.futureNoticesAndReflect.covers(.futureNoticesAndReflect))
+        #expect(RemindersScheduler.Scope.futureNoticesAndReflect.covers(.reflectOnly))
+        // Reflect-only touches nothing but reflect fires.
+        #expect(!RemindersScheduler.Scope.reflectOnly.covers(.all))
+        #expect(!RemindersScheduler.Scope.reflectOnly.covers(.futureNoticesAndReflect))
+        #expect(RemindersScheduler.Scope.reflectOnly.covers(.reflectOnly))
     }
 
     @Test("noticeIdentifierDayKey parses day-scoped identifiers and rejects legacy ones")

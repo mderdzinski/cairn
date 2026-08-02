@@ -198,7 +198,10 @@ struct TimelineView: View {
     }
 
     private func isUnreflected(_ moment: Moment) -> Bool {
-        moment.reflection?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        // Must mirror unreflectedRecentCountDescriptor's predicate exactly
+        // (nil or empty — ReflectSheet normalizes whitespace-only to nil), or
+        // the banner count and its jump target can disagree about membership.
+        moment.reflection?.isEmpty ?? true
     }
 
     private func scrollToFirstUnreflected(proxy: ScrollViewProxy) {

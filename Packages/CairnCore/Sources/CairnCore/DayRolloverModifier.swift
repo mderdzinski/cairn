@@ -16,7 +16,12 @@ public struct DayRolloverModifier: ViewModifier {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { action() }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            // NSCalendarDayChanged can be posted off the main thread; hop to
+            // main so the action can safely touch view state.
+            .onReceive(
+                NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
+                    .receive(on: DispatchQueue.main)
+            ) { _ in
                 action()
             }
     }

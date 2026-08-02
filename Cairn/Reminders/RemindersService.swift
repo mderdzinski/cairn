@@ -17,6 +17,11 @@ final class RemindersService: NSObject {
     private let center = UNUserNotificationCenter.current()
     private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Reminders")
     private var rescheduleGeneration: UInt64 = 0
+    /// Scope of the most recently submitted pipeline call. A queued call may
+    /// only skip itself as superseded when this covers its own scope — a
+    /// narrower newer call (reflect-only after a capture) must not swallow a
+    /// queued full rebuild (Retry button, settings edit).
+    private var latestSubmittedScope: RemindersScheduler.Scope = .all
     /// FIFO chain over every notification-center mutation. Each queued block
     /// awaits its predecessor before touching the center, so a full
     /// cancel + compute + add cycle is atomic per call: a stale cancel can
@@ -74,6 +79,7 @@ final class RemindersService: NSObject {
         now: Date = .now
     ) async {
         rescheduleGeneration &+= 1
+        latestSubmittedScope = scope
         let generation = rescheduleGeneration
         let previous = pipeline
         let task = Task { [weak self] in
@@ -118,6 +124,10 @@ final class RemindersService: NSObject {
         // Joins the same FIFO chain as reschedules: a direct cancel (permission
         // revoked) must not interleave with a queued reschedule's add loop.
         rescheduleGeneration &+= 1
+        // A cancel supersedes any queued work regardless of its scope — the
+        // only caller flips every toggle off first, so the end state (empty,
+        // disabled) is consistent.
+        latestSubmittedScope = .all
         let previous = pipeline
         let task = Task { [weak self] in
             await previous?.value
@@ -134,10 +144,13 @@ final class RemindersService: NSObject {
         now: Date,
         generation: UInt64
     ) async {
-        // Superseded while queued — the newest queued call redoes cancel+add
-        // from scratch, so skip the redundant churn entirely. Execution is
-        // strictly serial past this point; no further generation checks needed.
-        guard generation == rescheduleGeneration else { return }
+        // Superseded while queued — but only skip if the newest submitted call
+        // will redo this one's work. A newer narrower call (reflect-only from
+        // the didSave hook) doesn't touch notices, so a queued full rebuild
+        // must still run; FIFO order means the narrower call runs after and
+        // re-applies its fresher reflect state on top. Execution is strictly
+        // serial past this point; no further generation checks needed.
+        if generation != rescheduleGeneration, latestSubmittedScope.covers(scope) { return }
 
         // Must be the raw body, not cancelAll() — enqueueing from inside the
         // chain and awaiting it would deadlock behind this very block.
