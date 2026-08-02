@@ -48,8 +48,12 @@ public enum MomentAggregates {
             calendar.date(byAdding: .day, value: -offset, to: today)
         }.reversed()
 
+        // Clamp future-dated moments (cross-device clock skew, imports) into
+        // today's bucket instead of letting them fall outside the day list —
+        // they're already past the query's lower bound and counted by the
+        // headline total, so dropping them here would break `total == Σ bars`.
         let buckets = Dictionary(grouping: moments) { moment in
-            calendar.startOfDay(for: moment.timestamp)
+            min(calendar.startOfDay(for: moment.timestamp), today)
         }
 
         return days.map { day in
@@ -108,9 +112,13 @@ public struct PatternsDigest: Sendable {
         now: Date = .now,
         calendar: Calendar = .current
     ) {
-        daily = MomentAggregates.daily(moments: moments, range: range, now: now, calendar: calendar)
-        breakdown = MomentAggregates.breakdown(moments: moments)
-        split = MomentAggregates.contentmentSplit(moments: moments)
-        total = moments.count
+        // Filter once and feed every aggregate the same set, so the headline
+        // total, split, and breakdown can never disagree with the daily bars
+        // about which moments are in the window.
+        let windowed = MomentAggregates.filter(moments: moments, within: range, now: now, calendar: calendar)
+        daily = MomentAggregates.daily(moments: windowed, range: range, now: now, calendar: calendar)
+        breakdown = MomentAggregates.breakdown(moments: windowed)
+        split = MomentAggregates.contentmentSplit(moments: windowed)
+        total = windowed.count
     }
 }

@@ -1,10 +1,6 @@
 @testable import Cairn
 import Testing
 
-struct CairnTests {
-    @Test func example() {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
-    }
-}
+// Placeholder keeping this target's synchronized folder non-empty; app-target
+// tests go here. Shared logic is tested in Packages/CairnCore.
+struct CairnTests {}

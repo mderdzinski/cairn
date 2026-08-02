@@ -63,6 +63,26 @@ struct MomentAggregatesTests {
         #expect(days == days.sorted())
     }
 
+    @Test("daily() clamps future-dated moments into today's bucket")
+    func dailyClampsFutureDated() {
+        // Cross-device clock skew can stamp a just-synced capture slightly in
+        // the future; it must land in today's bar, not vanish off the axis.
+        let moments = [
+            moment(.contentment, daysAgo: 0),
+            moment(.aversion, daysAgo: -1),
+        ]
+        let daily = MomentAggregates.daily(
+            moments: moments,
+            range: .week,
+            now: now,
+            calendar: calendar
+        )
+        let today = daily.last
+        #expect(today?.contentment == 1)
+        #expect(today?.hindrance == 1)
+        #expect(daily.map(\.total).reduce(0, +) == 2)
+    }
+
     @Test("daily() bucketizes correctly into contentment/hindrance")
     func dailyBuckets() {
         let moments = [
@@ -224,5 +244,46 @@ struct PatternsDigestTests {
         #expect(digest.daily.count == 7)
         #expect(digest.daily.allSatisfy { $0.total == 0 })
         #expect(digest.breakdown.isEmpty)
+    }
+
+    @Test("digest counts a future-dated moment in the total and in today's bar")
+    func digestIncludesFutureDated() {
+        let moments = [
+            moment(.contentment, daysAgo: 0),
+            moment(.aversion, daysAgo: -1),
+        ]
+        let digest = PatternsDigest(moments: moments, range: .week, now: now, calendar: calendar)
+        #expect(digest.total == 2)
+        #expect(digest.split.friction == 1)
+        #expect(digest.daily.last?.hindrance == 1)
+    }
+
+    @Test("digest excludes out-of-window moments from every aggregate")
+    func digestExcludesOutOfWindow() {
+        let moments = [
+            moment(.contentment, daysAgo: 0),
+            moment(.desire, daysAgo: 10),
+        ]
+        let digest = PatternsDigest(moments: moments, range: .week, now: now, calendar: calendar)
+        #expect(digest.total == 1)
+        #expect(digest.split.friction == 0)
+        #expect(!digest.breakdown.contains { $0.category == .desire })
+    }
+
+    @Test("digest total always equals the sum of the daily bars")
+    func digestTotalMatchesBars() {
+        // Mixed set: in-window, future-dated (clamped into today), and
+        // out-of-window (excluded everywhere) — the headline and the chart
+        // must still agree.
+        let moments = [
+            moment(.contentment, daysAgo: 0),
+            moment(.contentment, daysAgo: 3),
+            moment(.aversion, daysAgo: -1),
+            moment(.desire, daysAgo: 6),
+            moment(.heaviness, daysAgo: 12),
+        ]
+        let digest = PatternsDigest(moments: moments, range: .week, now: now, calendar: calendar)
+        #expect(digest.total == digest.daily.map(\.total).reduce(0, +))
+        #expect(digest.total == 4)
     }
 }

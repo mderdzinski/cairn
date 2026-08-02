@@ -4,12 +4,16 @@ import SwiftUI
 
 struct PatternsView: View {
     @State private var range: PatternsRange = .week
+    /// Day anchor for the query cutoff and digest. Re-derived on foreground and
+    /// midnight so the week/month window can't go stale while the tab stays
+    /// mounted — the same rollover fix Path and Capture already carry.
+    @State private var dayStart = Calendar.current.startOfDay(for: .now)
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.cairnPaper.ignoresSafeArea()
-                PatternsContent(range: $range)
+                PatternsContent(range: $range, dayStart: dayStart)
             }
             .navigationTitle("Patterns")
             .navigationBarTitleDisplayMode(.inline)
@@ -20,6 +24,14 @@ struct PatternsView: View {
                         .foregroundStyle(Color.cairnTextPrimary)
                 }
             }
+            .refreshOnDayRollover(perform: refreshDayStart)
+        }
+    }
+
+    private func refreshDayStart() {
+        let start = Calendar.current.startOfDay(for: .now)
+        if start != dayStart {
+            dayStart = start
         }
     }
 }
@@ -28,19 +40,22 @@ private struct DigestKey: Equatable {
     let count: Int
     let last: Date?
     let range: PatternsRange
+    let day: Date
 }
 
 private struct PatternsContent: View {
     @Binding var range: PatternsRange
+    let dayStart: Date
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var moments: [Moment]
     @State private var hasAnyMoments: Bool = true
     @State private var digest: PatternsDigest?
 
-    init(range: Binding<PatternsRange>) {
+    init(range: Binding<PatternsRange>, dayStart: Date) {
         _range = range
-        let cutoff = MomentAggregates.cutoffDate(for: range.wrappedValue)
+        self.dayStart = dayStart
+        let cutoff = MomentAggregates.cutoffDate(for: range.wrappedValue, now: dayStart)
         _moments = Query(
             filter: #Predicate<Moment> { $0.timestamp >= cutoff },
             sort: \Moment.timestamp,
@@ -65,11 +80,20 @@ private struct PatternsContent: View {
             .padding(.bottom, CairnSpacing.size12)
         }
         .scrollContentBackground(.hidden)
-        .task(id: DigestKey(count: moments.count, last: moments.first?.timestamp, range: range)) {
-            digest = PatternsDigest(moments: moments, range: range)
+        .task(id: DigestKey(count: moments.count, last: moments.first?.timestamp, range: range, day: dayStart)) {
+            // dayStart as `now` pins the digest's day axis to the same anchor
+            // as the query cutoff (both only use startOfDay).
+            digest = PatternsDigest(moments: moments, range: range, now: dayStart)
         }
         .task {
             refreshHasAnyMoments()
+            // The count-based onChange below misses 0 → 0 transitions (all
+            // remaining moments deleted from another tab while this range is
+            // already empty), leaving stale empty-state copy. Any save — local
+            // or a CloudKit import — re-derives it.
+            for await _ in NotificationCenter.default.notifications(named: ModelContext.didSave) {
+                refreshHasAnyMoments()
+            }
         }
         .onChange(of: moments.count) { _, _ in
             refreshHasAnyMoments()

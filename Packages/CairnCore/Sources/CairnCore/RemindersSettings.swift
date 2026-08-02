@@ -68,7 +68,7 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
     /// Blob is unreadable JSON → return defaults.
     public static func decode(_ data: Data) -> RemindersSettings {
         if let strict = try? JSONDecoder().decode(RemindersSettings.self, from: data) {
-            return strict
+            return strict.sanitized()
         }
         guard
             let raw = try? JSONSerialization.jsonObject(with: data),
@@ -86,7 +86,26 @@ public struct RemindersSettings: Codable, Sendable, Equatable {
             activeHoursEnd: object["activeHoursEnd"] as? Int ?? defaults.activeHoursEnd,
             reflectTime: object["reflectTime"] as? Int ?? defaults.reflectTime,
             hasPrimedPermission: object["hasPrimedPermission"] as? Bool ?? defaults.hasPrimedPermission
-        )
+        ).sanitized()
+    }
+
+    /// Clamp persisted time fields to a valid minutes-since-midnight range and fall
+    /// back to the default active-hours window when the stored one is inverted or
+    /// empty. Decoding is lenient by design, so a corrupted or future-schema blob
+    /// can carry any `Int` here; the scheduler silently produces nothing for an
+    /// invalid window, which would look like reminders breaking with no cause.
+    func sanitized() -> RemindersSettings {
+        var out = self
+        let maxMinute = 24 * 60 - 1
+        out.reflectTime = min(max(out.reflectTime, 0), maxMinute)
+        out.activeHoursStart = min(max(out.activeHoursStart, 0), maxMinute)
+        out.activeHoursEnd = min(max(out.activeHoursEnd, 0), maxMinute)
+        if out.activeHoursEnd <= out.activeHoursStart {
+            let defaults = RemindersSettings()
+            out.activeHoursStart = defaults.activeHoursStart
+            out.activeHoursEnd = defaults.activeHoursEnd
+        }
+        return out
     }
 }
 

@@ -30,7 +30,16 @@ enum SyncStatus: Equatable {
 final class SyncStatusMonitor {
     private let logger = Logger(subsystem: "com.markderdzinski.Cairn", category: "Sync")
     private(set) var status: SyncStatus
-    private var observerTask: Task<Void, Never>?
+    // nonisolated(unsafe) so the nonisolated deinit can cancel them; both are
+    // only ever written on the main actor, and deinit runs after the last
+    // reference is gone, so there is no concurrent access.
+    private nonisolated(unsafe) var observerTask: Task<Void, Never>?
+    private nonisolated(unsafe) var syncingWatchdog: Task<Void, Never>?
+
+    /// How long `.syncing` may persist without a terminal event before the
+    /// monitor concludes the finish notification was missed (delivered while
+    /// suspended, dropped stream) and stops claiming a sync is in flight.
+    private static let syncingTimeout: Duration = .seconds(5 * 60)
 
     init(backing: MomentStoreBacking) {
         switch backing {
@@ -41,6 +50,11 @@ final class SyncStatusMonitor {
         }
         guard backing == .cloud else { return }
         startObserving()
+    }
+
+    deinit {
+        observerTask?.cancel()
+        syncingWatchdog?.cancel()
     }
 
     private func startObserving() {
@@ -64,6 +78,7 @@ final class SyncStatusMonitor {
         // to see it.
         if let error = event.error {
             logger.error("CloudKit \(String(describing: event.type)) failed: \(error.localizedDescription)")
+            syncingWatchdog?.cancel()
             status = .failed(since: event.endDate ?? .now)
             return
         }
@@ -75,8 +90,24 @@ final class SyncStatusMonitor {
 
         if event.endDate == nil {
             status = .syncing
+            armSyncingWatchdog()
             return
         }
+        syncingWatchdog?.cancel()
         status = .synced(since: event.endDate ?? .now)
+    }
+
+    /// `.syncing` can only be cleared by another event notification; if the
+    /// terminal event is never delivered (app suspended mid-sync), the pip
+    /// would claim "Syncing" for the rest of the session. Degrade to `.idle`
+    /// after a timeout — a missed notification isn't evidence of failure, and
+    /// the pip's contract is silence when nothing is knowable.
+    private func armSyncingWatchdog() {
+        syncingWatchdog?.cancel()
+        syncingWatchdog = Task { [weak self] in
+            try? await Task.sleep(for: Self.syncingTimeout)
+            guard !Task.isCancelled, let self, status == .syncing else { return }
+            status = .idle
+        }
     }
 }

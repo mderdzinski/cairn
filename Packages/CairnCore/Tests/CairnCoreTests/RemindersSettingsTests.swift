@@ -130,4 +130,61 @@ struct RemindersSettingsTests {
         let decoded = RemindersSettings.decode(Data())
         #expect(decoded == RemindersSettings())
     }
+
+    @Test("strict-path decode clamps out-of-range time fields")
+    func strictPathClampsOutOfRange() throws {
+        // Valid JSON, absurd value — the strict decoder accepts it as readily
+        // as the lenient path, so sanitization must cover both.
+        let json = """
+        {
+          "schemaVersion": 1,
+          "noticeEnabled": false,
+          "reflectEnabled": true,
+          "freq": "once",
+          "activeHoursStart": 480,
+          "activeHoursEnd": 1260,
+          "reflectTime": 99999,
+          "hasPrimedPermission": false
+        }
+        """
+        let data = try #require(json.data(using: .utf8))
+        let decoded = RemindersSettings.decode(data)
+        #expect(decoded.reflectTime == 24 * 60 - 1)
+        #expect(decoded.activeHoursStart == 480)
+        #expect(decoded.activeHoursEnd == 1260)
+    }
+
+    @Test("an inverted active-hours window falls back to the default window")
+    func invertedWindowFallsBackToDefaults() throws {
+        let json = """
+        {
+          "noticeEnabled": true,
+          "freq": "few",
+          "activeHoursStart": 1200,
+          "activeHoursEnd": 600
+        }
+        """
+        let data = try #require(json.data(using: .utf8))
+        let decoded = RemindersSettings.decode(data)
+        let defaults = RemindersSettings()
+        #expect(decoded.activeHoursStart == defaults.activeHoursStart)
+        #expect(decoded.activeHoursEnd == defaults.activeHoursEnd)
+        // Non-window fields untouched.
+        #expect(decoded.noticeEnabled == true)
+        #expect(decoded.freq == .few)
+    }
+
+    @Test("a negative start clamps to zero without resetting a valid window")
+    func negativeStartClampsWithoutFallback() throws {
+        let json = """
+        {
+          "activeHoursStart": -5,
+          "activeHoursEnd": 600
+        }
+        """
+        let data = try #require(json.data(using: .utf8))
+        let decoded = RemindersSettings.decode(data)
+        #expect(decoded.activeHoursStart == 0)
+        #expect(decoded.activeHoursEnd == 600)
+    }
 }

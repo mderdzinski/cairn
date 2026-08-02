@@ -13,10 +13,6 @@ public struct CategoryDot: View {
         self.filled = filled
     }
 
-    private var shouldShowGlyph: Bool {
-        showsGlyph
-    }
-
     private var glyphSize: CGFloat {
         size * (filled ? 0.66 : 0.62)
     }
@@ -40,7 +36,7 @@ public struct CategoryDot: View {
                     .allowsHitTesting(false)
             }
             .overlay {
-                if shouldShowGlyph {
+                if showsGlyph {
                     Image(category.assetName)
                         .resizable()
                         .scaledToFit()

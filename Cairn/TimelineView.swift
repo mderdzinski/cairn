@@ -5,7 +5,6 @@ import SwiftUI
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SyncStatusMonitor.self) private var syncMonitor
-    @Environment(\.scenePhase) private var scenePhase
 
     @State private var moments: [Moment] = []
     /// Flips true when a page returns fewer than pageSize results — that's the only
@@ -27,8 +26,18 @@ struct TimelineView: View {
     /// to the recent window keeps the prompt a gentle invitation instead of an
     /// ever-growing all-time backlog — older unreflected moments age out of it.
     @State private var recentUnreflectedCount = 0
+    /// Day anchor for the "Today"/"Yesterday" section titles. Participates in
+    /// body, so the midnight rollover always invalidates the headers even when
+    /// the three cached counts happen not to change (SwiftUI dedupes equal
+    /// state assignments, so refreshCounts() alone can't be relied on).
+    @State private var dayStart = Calendar.current.startOfDay(for: .now)
 
     @State private var reflectingMoment: Moment?
+    /// A delete requested from inside the ReflectSheet, deferred until the
+    /// sheet's dismissal animation completes. Deleting immediately leaves the
+    /// sheet rendering a deleted PersistentModel for ~0.3s — a crash window if
+    /// autosave or the didSave refresh fires mid-animation.
+    @State private var pendingDelete: Moment?
 
     var body: some View {
         NavigationStack {
@@ -49,11 +58,14 @@ struct TimelineView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .sheet(item: $reflectingMoment) { moment in
+            .sheet(item: $reflectingMoment, onDismiss: performPendingDelete) { moment in
                 ReflectSheet(
                     moment: moment,
                     onDismiss: { reflectingMoment = nil },
-                    onDelete: { delete(moment) }
+                    onDelete: {
+                        pendingDelete = moment
+                        reflectingMoment = nil
+                    }
                 )
             }
             .onAppear {
@@ -72,17 +84,14 @@ struct TimelineView: View {
                     refreshCounts()
                 }
             }
-            .onChange(of: scenePhase) { _, phase in
+            .refreshOnDayRollover {
                 // The week-bounded counts (headline and reflection banner) bake
                 // their cutoff in at fetch time, so they go stale when the day
-                // rolls over while Path stays mounted. Foregrounding after a
-                // suspend that crossed midnight won't have delivered
-                // NSCalendarDayChanged, so re-derive on every activation — same
-                // pattern as CaptureView's today count.
-                if phase == .active { refreshCounts() }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                // rolls over while Path stays mounted — same pattern as
+                // CaptureView's today count. The day anchor keeps the
+                // "Today"/"Yesterday" headers honest alongside them.
                 refreshCounts()
+                refreshDayStart()
             }
             .task {
                 // Restore the liveness we lost by moving off @Query. Any save on
@@ -181,21 +190,56 @@ struct TimelineView: View {
 
     /// The newest moment still inside the recent window that has no reflection —
     /// the first one the reader meets scrolling down from the top. `nil` when none
-    /// is currently paged in (in practice the recent window sits inside the first
-    /// page, so this resolves), in which case the banner tap is a no-op.
+    /// is currently paged in; `scrollToFirstUnreflected` then fetches the target
+    /// from the store and extends the loaded window to reach it.
     private var firstRecentUnreflectedID: UUID? {
         let cutoff = MomentTimelineFetcher.pastWeekCutoff()
         return moments.first { $0.timestamp >= cutoff && isUnreflected($0) }?.id
     }
 
     private func isUnreflected(_ moment: Moment) -> Bool {
-        moment.reflection?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        // Must mirror unreflectedRecentCountDescriptor's predicate exactly
+        // (nil or empty — ReflectSheet normalizes whitespace-only to nil), or
+        // the banner count and its jump target can disagree about membership.
+        moment.reflection?.isEmpty ?? true
     }
 
     private func scrollToFirstUnreflected(proxy: ScrollViewProxy) {
-        guard let targetID = firstRecentUnreflectedID else { return }
-        withAnimation {
-            proxy.scrollTo(targetID, anchor: .top)
+        // Tap-time recompute: after midnight the displayed count can be stale —
+        // the cutoff may now exclude everything it counted. Re-deriving makes
+        // the banner disappear instead of no-opping.
+        refreshCounts()
+        guard recentUnreflectedCount > 0 else { return }
+
+        if let targetID = firstRecentUnreflectedID {
+            withAnimation {
+                proxy.scrollTo(targetID, anchor: .top)
+            }
+            return
+        }
+
+        // The target exists in the store but isn't in the loaded slice (more
+        // than a page of moments this week, all newer ones reflected). Fetch
+        // its identity, then extend the window down to it — descriptorNewerThan
+        // returns a strict superset of the loaded slice (the target is at or
+        // below the current oldest), so scroll position is preserved.
+        guard let target = try? modelContext.fetch(
+            MomentTimelineFetcher.firstUnreflectedRecentDescriptor()
+        ).first else { return }
+        let fetched = (try? modelContext.fetch(
+            MomentTimelineFetcher.descriptorNewerThan(target.timestamp)
+        )) ?? []
+        guard fetched.contains(where: { $0.id == target.id }) else { return }
+        moments = fetched
+        if moments.count < totalStoreCount {
+            hasReachedStart = false
+        }
+        Task { @MainActor in
+            // Give List one tick to materialize the new rows before scrolling.
+            await Task.yield()
+            withAnimation {
+                proxy.scrollTo(target.id, anchor: .top)
+            }
         }
     }
 
@@ -302,9 +346,19 @@ struct TimelineView: View {
     }
 
     private func sectionTitle(for day: Date) -> String {
-        if Calendar.current.isDateInToday(day) { return "Today" }
-        if Calendar.current.isDateInYesterday(day) { return "Yesterday" }
+        // Section keys are startOfDay values, so equality against the day
+        // anchor is exact — and reading state here is what forces the headers
+        // to re-evaluate when the anchor changes at midnight.
+        if day == dayStart { return "Today" }
+        if day == Calendar.current.date(byAdding: .day, value: -1, to: dayStart) { return "Yesterday" }
         return day.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    private func refreshDayStart() {
+        let start = Calendar.current.startOfDay(for: .now)
+        if start != dayStart {
+            dayStart = start
+        }
     }
 
     // MARK: - Data loading
@@ -390,6 +444,12 @@ struct TimelineView: View {
         recentUnreflectedCount = (try? modelContext.fetchCount(
             MomentTimelineFetcher.unreflectedRecentCountDescriptor()
         )) ?? 0
+    }
+
+    private func performPendingDelete() {
+        guard let moment = pendingDelete else { return }
+        pendingDelete = nil
+        delete(moment)
     }
 
     private func delete(_ moment: Moment) {

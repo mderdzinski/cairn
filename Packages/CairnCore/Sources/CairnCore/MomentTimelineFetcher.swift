@@ -85,22 +85,18 @@ public enum MomentTimelineFetcher {
         )
     }
 
-    /// Descriptor that counts moments with no reflection. Passed to
-    /// `modelContext.fetchCount(_:)` so the "N moments waiting for reflection"
-    /// banner reflects the entire store, not just what's paginated into memory —
-    /// otherwise a user with older unreflected moments would see an undercount
-    /// (or no banner at all) until they scrolled far enough to load them.
+    /// "Not reflected, within the trailing 7-day window" — shared by the count
+    /// and first-match descriptors so the banner's number and its jump target
+    /// can never disagree about membership.
     ///
-    /// `ReflectSheet.save` already trims whitespace-only reflections down to
-    /// `nil` before storing, so the two-arm predicate `reflection == nil ||
-    /// reflection == ""` covers every "not reflected" case.
-    public static func unreflectedCountDescriptor() -> FetchDescriptor<Moment> {
-        FetchDescriptor<Moment>(
-            // SwiftData #Predicate doesn't reliably lower `.isEmpty` on optional
-            // strings, so the two-arm comparison stays.
-            // swiftlint:disable:next empty_string
-            predicate: #Predicate { $0.reflection == nil || $0.reflection == "" }
-        )
+    /// `ReflectSheet.save` trims whitespace-only reflections down to `nil`
+    /// before storing, so the two-arm test `reflection == nil || reflection
+    /// == ""` covers every "not reflected" case. (SwiftData #Predicate doesn't
+    /// reliably lower `.isEmpty` on optional strings, so the two-arm comparison
+    /// stays.)
+    private static func unreflectedRecentPredicate(cutoff: Date) -> Predicate<Moment> {
+        // swiftlint:disable:next empty_string
+        #Predicate { ($0.reflection == nil || $0.reflection == "") && $0.timestamp >= cutoff }
     }
 
     /// Descriptor that counts unreflected moments **within the trailing 7-day
@@ -110,18 +106,54 @@ public enum MomentTimelineFetcher {
     /// backlog: older unreflected moments quietly age out of the count. They stay
     /// reflectable inline (the row still offers "Add a reflection") — they're just
     /// no longer surfaced by the banner, because a weeks-old feeling has gone cold.
-    ///
-    /// Same "not reflected" semantics as `unreflectedCountDescriptor`: `reflection`
-    /// is `nil` or empty (`ReflectSheet.save` normalizes whitespace-only to `nil`).
     public static func unreflectedRecentCountDescriptor(
         now: Date = .now,
         calendar: Calendar = .current
     ) -> FetchDescriptor<Moment> {
-        let cutoff = pastWeekCutoff(now: now, calendar: calendar)
-        return FetchDescriptor<Moment>(
-            // swiftlint:disable:next empty_string
-            predicate: #Predicate { ($0.reflection == nil || $0.reflection == "") && $0.timestamp >= cutoff }
+        FetchDescriptor<Moment>(
+            predicate: unreflectedRecentPredicate(cutoff: pastWeekCutoff(now: now, calendar: calendar))
         )
+    }
+
+    /// The newest unreflected moment inside the trailing 7-day window — the row
+    /// the reflection banner promises to jump to. Sorted `(timestamp, id)`
+    /// reverse to match the timeline's paging order exactly, so "first fetched"
+    /// and "topmost in the list" are the same row even under timestamp ties.
+    public static func firstUnreflectedRecentDescriptor(
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> FetchDescriptor<Moment> {
+        var descriptor = FetchDescriptor<Moment>(
+            predicate: unreflectedRecentPredicate(cutoff: pastWeekCutoff(now: now, calendar: calendar)),
+            sortBy: [
+                SortDescriptor(\Moment.timestamp, order: .reverse),
+                SortDescriptor(\Moment.id, order: .reverse),
+            ]
+        )
+        descriptor.fetchLimit = 1
+        return descriptor
+    }
+
+    /// Timestamp of the newest moment "waiting for reflection" in the banner's
+    /// sense, or nil when none is. Drives conditional reflect-reminder
+    /// scheduling; the window and reflection semantics must stay identical to
+    /// `unreflectedRecentCountDescriptor` so the reminder and the banner never
+    /// disagree. The scheduler uses the timestamp — not a boolean — to stop
+    /// scheduling fires past the day this moment ages out of the window.
+    /// Fails open on a fetch error (returns `now`, as if a moment were just
+    /// captured) — a transient store failure should cost at worst a few
+    /// unneeded nudges, not silently disable a feature the user enabled.
+    public static func newestWaitingMomentTimestamp(
+        in context: ModelContext,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Date? {
+        do {
+            return try context.fetch(firstUnreflectedRecentDescriptor(now: now, calendar: calendar))
+                .first?.timestamp
+        } catch {
+            return now
+        }
     }
 
     /// Start-of-day 6 days before `now` — i.e. a 7-day inclusive window. Exposed so
