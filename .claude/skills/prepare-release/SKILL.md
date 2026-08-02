@@ -137,24 +137,23 @@ git diff <from-tag>..<until-tag> -- \
 
 ### Step 10: Write the notes
 
-Use exactly this section structure (omit any section that would be empty). The line under the title records the range for anyone reading the file later; drop it when pasting into App Store Connect.
+The file's body is pasted **verbatim** into App Store Connect's What's New field, which renders plain text — so no markdown ceremony at all: no title (the filename carries the version), no `#` headers, no `*` bullets. Plain section labels and hyphen bullets only. Use exactly this structure (omit any section that would be empty):
 
 ```
-# Cairn <until-tag>
+New
 
-Everything shipped since <from-tag>.
+- <list>
 
-## New
-* <list>
+Improvements
 
-## Improvements
-* <list>
+- <list>
 
-## Fixes
-* <list>
+Fixes
+
+- <list>
 ```
 
-Keep the whole thing well under App Store Connect's 4,000-character What's New limit — with the headers stripped, the bullets should paste directly into the What's New field.
+Keep the whole thing well under App Store Connect's 4,000-character What's New limit.
 
 ### Step 11: Completeness check
 
