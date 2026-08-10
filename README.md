@@ -3,7 +3,7 @@
 A quiet iOS and watchOS app for noticing what you feel and returning to reflect on it later.
 
 **Site:** [noticedaily.com](https://noticedaily.com)
-**Status:** v1.0, in App Store review.
+**Status:** v1.1.1, on the [App Store](https://apps.apple.com/us/app/cairn-notice-daily/id6788949876).
 
 ## What Cairn is
 
