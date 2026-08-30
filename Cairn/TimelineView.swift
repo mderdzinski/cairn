@@ -1,4 +1,5 @@
 import CairnCore
+import CoreData
 import SwiftData
 import SwiftUI
 
@@ -85,18 +86,24 @@ struct TimelineView: View {
                 }
             }
             .refreshOnDayRollover {
-                // The week-bounded counts (headline and reflection banner) bake
+                // Fires on scene activation and midnight rollover. The
+                // week-bounded counts (headline and reflection banner) bake
                 // their cutoff in at fetch time, so they go stale when the day
                 // rolls over while Path stays mounted — same pattern as
                 // CaptureView's today count. The day anchor keeps the
-                // "Today"/"Yesterday" headers honest alongside them.
-                refreshCounts()
+                // "Today"/"Yesterday" headers honest alongside them. The window
+                // refetch (which runs refreshCounts first) matters on the
+                // activation half: .onAppear doesn't fire on background →
+                // foreground, so without it a warm resume with Path already
+                // selected shows the pre-suspend list until the user switches
+                // tabs.
                 refreshDayStart()
+                Task { await refreshInitialWindow() }
             }
             .task {
-                // Restore the liveness we lost by moving off @Query. Any save on
-                // any ModelContext — our own writes, but also CloudKit imports
-                // syncing a watch capture — fires this notification. Refetch the
+                // Restore the liveness we lost by moving off @Query, half one:
+                // in-process writes. Any ModelContext save — a capture, a
+                // reflection, a delete — fires this notification. Refetch the
                 // newest page and cheap counts so Path stays live while it's on
                 // screen. The .task is cancelled when the view leaves the tree.
                 // No debounce: refresh is idempotent and cheap (two fetchCount
@@ -105,6 +112,27 @@ struct TimelineView: View {
                 for await _ in NotificationCenter.default.notifications(
                     named: ModelContext.didSave
                 ) {
+                    await refreshInitialWindow()
+                }
+            }
+            .task {
+                // Liveness half two: CloudKit imports. ModelContext.didSave is
+                // posted by in-process ModelContext saves; the mirroring import
+                // that lands a watch capture is applied by the container's
+                // internal background context and doesn't reliably post it — so
+                // without this stream a watch capture only appears after a tab
+                // switch. Imports also land seconds *after* foregrounding,
+                // which is why the activation refetch alone can't cover them.
+                // Refresh when an import event finishes cleanly (same
+                // observation pattern as SyncStatusMonitor; on a local-only
+                // store the notification simply never fires).
+                for await note in NotificationCenter.default.notifications(
+                    named: NSPersistentCloudKitContainer.eventChangedNotification
+                ) {
+                    let key = NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+                    guard let event = note.userInfo?[key] as? NSPersistentCloudKitContainer.Event,
+                          event.type == .import, event.endDate != nil, event.error == nil
+                    else { continue }
                     await refreshInitialWindow()
                 }
             }
@@ -367,8 +395,9 @@ struct TimelineView: View {
         MomentTimelineFetcher.defaultPageSize
     }
 
-    /// Fires on first appear, tab switch back to Path, and every ModelContext.didSave
-    /// while Path is visible. Replaces the loaded slice wholesale with a fresh
+    /// Fires on first appear, tab switch back to Path, scene activation, every
+    /// ModelContext.didSave, and every completed CloudKit import while Path is
+    /// visible. Replaces the loaded slice wholesale with a fresh
     /// consistent snapshot from the store — so remote deletes propagate (a stale
     /// merge-and-carry-forward strategy would leave deleted rows on screen), and
     /// future-dated arrivals (device clock skew, imports) still surface (a `.now`
