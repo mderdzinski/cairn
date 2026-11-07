@@ -166,13 +166,13 @@ public enum RemindersScheduler {
         let attempts = max(cap * 20, 60)
         for _ in 0 ..< attempts where dayFires.count < cap {
             guard let candidate = randomFire(
-                settings: context.settings,
-                referenceDay: referenceDay,
-                calendar: context.calendar,
-                randomSource: &randomSource
-            ),
-                candidate > context.now.addingTimeInterval(minimumLeadTime),
-                dayFires.allSatisfy({ abs($0.timeIntervalSince(candidate)) >= minimumNoticeSpacing })
+                      settings: context.settings,
+                      referenceDay: referenceDay,
+                      calendar: context.calendar,
+                      randomSource: &randomSource
+                  ),
+                  candidate > context.now.addingTimeInterval(minimumLeadTime),
+                  dayFires.allSatisfy({ abs($0.timeIntervalSince(candidate)) >= minimumNoticeSpacing })
             else { continue }
             dayFires.append(candidate)
         }
