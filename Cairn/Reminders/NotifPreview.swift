@@ -57,7 +57,7 @@ struct NotifPreview: View {
             Image("CairnGlyph")
                 .renderingMode(.template)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .padding(4)
                 .foregroundStyle(Color.cairnStone600)
         }
