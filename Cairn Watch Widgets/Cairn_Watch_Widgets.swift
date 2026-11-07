@@ -48,7 +48,7 @@ struct CairnCaptureLauncherView: View {
         Image("CairnComplication")
             .renderingMode(.template)
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .foregroundStyle(.primary)
             .widgetAccentable()
     }

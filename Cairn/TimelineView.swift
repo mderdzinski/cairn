@@ -1,9 +1,11 @@
 import CairnCore
+import CoreData
 import SwiftData
 import SwiftUI
 
 struct TimelineView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(SyncStatusMonitor.self) private var syncMonitor
 
     @State private var moments: [Moment] = []
@@ -33,82 +35,232 @@ struct TimelineView: View {
     @State private var dayStart = Calendar.current.startOfDay(for: .now)
 
     @State private var reflectingMoment: Moment?
+    /// The reflection being typed for `reflectingMoment`. Owned here rather
+    /// than by the editor: crossing the compact/regular boundary mid-edit
+    /// (folding or unfolding a Duo, rotating a Pro Max) swaps the sheet for
+    /// the pane and rebuilds the editor, and a draft held in its own @State
+    /// would be thrown away with it. Seeded from the moment's saved
+    /// reflection whenever a selection begins.
+    @State private var reflectionDraft = ""
+    /// Preview hook: the moment to show in the reflection pane/sheet from the
+    /// first frame. The app never passes one; it exists so the split layout can
+    /// be rendered with a selection on the Duo inner display.
+    private let initialReflectingMoment: Moment?
+
+    init(initialReflectingMoment: Moment? = nil) {
+        self.initialReflectingMoment = initialReflectingMoment
+        _reflectingMoment = State(initialValue: initialReflectingMoment)
+        _reflectionDraft = State(initialValue: initialReflectingMoment?.reflection ?? "")
+    }
+
     /// A delete requested from inside the ReflectSheet, deferred until the
     /// sheet's dismissal animation completes. Deleting immediately leaves the
     /// sheet rendering a deleted PersistentModel for ~0.3s — a crash window if
     /// autosave or the didSave refresh fires mid-animation.
     @State private var pendingDelete: Moment?
 
+    /// Regular width (iPhone Duo open, landscape poses) gets the list and the
+    /// reflection editor side by side — one more level of hierarchy on the
+    /// larger display, the same pattern Mail uses. Compact width keeps the
+    /// list with the editor as a bottom sheet. All data state lives on this
+    /// view, so folding or unfolding swaps the container without losing the
+    /// loaded window, scroll position, or the moment being reflected on.
+    ///
+    /// Not a `NavigationSplitView`: on Duo's inner display in portrait (669pt
+    /// wide) that collapses to a detail-only column behind a sidebar toggle at
+    /// any sidebar width, which is exactly the hidden hierarchy Apple's
+    /// guidance warns against. An `ArrangementView` keeps both halves on
+    /// screen and moves them to either side of the fold when the device is
+    /// partially open.
+    private var usesSplitLayout: Bool {
+        horizontalSizeClass == .regular
+    }
+
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.cairnPaper.ignoresSafeArea()
-                content
-            }
-            .navigationTitle("Path")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Path")
-                        .font(.cairnTitle)
-                        .foregroundStyle(Color.cairnTextPrimary)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    SyncStatusPip(status: syncMonitor.status)
-                        .allowsHitTesting(false)
-                }
-            }
-            .sheet(item: $reflectingMoment, onDismiss: performPendingDelete) { moment in
-                ReflectSheet(
-                    moment: moment,
-                    onDismiss: { reflectingMoment = nil },
-                    onDelete: {
-                        pendingDelete = moment
-                        reflectingMoment = nil
-                    }
-                )
-            }
-            .onAppear {
-                // Fires on first appear and every tab switch back to Path. Refetches
-                // the newest page (so captures made on other tabs / the watch show up)
-                // and merges with anything older we've paged in — so scroll position
-                // is preserved across tab switches.
-                Task { await refreshInitialWindow() }
-            }
-            .onChange(of: reflectingMoment) { previous, current in
-                // The sheet just dismissed. A reflection may have been saved (or
-                // cleared) — refresh counts so the "N waiting for reflection" banner
-                // reflects the just-changed state instead of waiting for the next
-                // tab switch.
-                if previous != nil, current == nil {
-                    refreshCounts()
-                }
-            }
-            .refreshOnDayRollover {
-                // The week-bounded counts (headline and reflection banner) bake
-                // their cutoff in at fetch time, so they go stale when the day
-                // rolls over while Path stays mounted — same pattern as
-                // CaptureView's today count. The day anchor keeps the
-                // "Today"/"Yesterday" headers honest alongside them.
-                refreshCounts()
-                refreshDayStart()
-            }
-            .task {
-                // Restore the liveness we lost by moving off @Query. Any save on
-                // any ModelContext — our own writes, but also CloudKit imports
-                // syncing a watch capture — fires this notification. Refetch the
-                // newest page and cheap counts so Path stays live while it's on
-                // screen. The .task is cancelled when the view leaves the tree.
-                // No debounce: refresh is idempotent and cheap (two fetchCount
-                // queries plus a bounded page fetch), so back-to-back saves are
-                // fine.
-                for await _ in NotificationCenter.default.notifications(
-                    named: ModelContext.didSave
-                ) {
-                    await refreshInitialWindow()
-                }
+        Group {
+            if usesSplitLayout {
+                splitLayout
+            } else {
+                stackLayout
             }
         }
+        .onAppear {
+            // Fires on first appear and every tab switch back to Path. Refetches
+            // the newest page (so captures made on other tabs / the watch show up)
+            // and merges with anything older we've paged in — so scroll position
+            // is preserved across tab switches.
+            Task { await refreshInitialWindow() }
+        }
+        .onChange(of: reflectingMoment) { previous, current in
+            // The sheet just dismissed. A reflection may have been saved (or
+            // cleared) — refresh counts so the "N waiting for reflection" banner
+            // reflects the just-changed state instead of waiting for the next
+            // tab switch.
+            if previous != nil, current == nil {
+                refreshCounts()
+            }
+        }
+        .refreshOnDayRollover {
+            // Fires on scene activation and midnight rollover. The
+            // week-bounded counts (headline and reflection banner) bake
+            // their cutoff in at fetch time, so they go stale when the day
+            // rolls over while Path stays mounted — same pattern as
+            // CaptureView's today count. The day anchor keeps the
+            // "Today"/"Yesterday" headers honest alongside them. The window
+            // refetch (which runs refreshCounts first) matters on the
+            // activation half: .onAppear doesn't fire on background →
+            // foreground, so without it a warm resume with Path already
+            // selected shows the pre-suspend list until the user switches
+            // tabs.
+            refreshDayStart()
+            Task { await refreshInitialWindow() }
+        }
+        .task {
+            // Restore the liveness we lost by moving off @Query, half one:
+            // in-process writes. Any ModelContext save — a capture, a
+            // reflection, a delete — fires this notification. Refetch the
+            // newest page and cheap counts so Path stays live while it's on
+            // screen. The .task is cancelled when the view leaves the tree.
+            // No debounce: refresh is idempotent and cheap (two fetchCount
+            // queries plus a bounded page fetch), so back-to-back saves are
+            // fine.
+            for await _ in NotificationCenter.default.notifications(
+                named: ModelContext.didSave
+            ) {
+                await refreshInitialWindow()
+            }
+        }
+        .task {
+            // Liveness half two: CloudKit imports. ModelContext.didSave is
+            // posted by in-process ModelContext saves; the mirroring import
+            // that lands a watch capture is applied by the container's
+            // internal background context and doesn't reliably post it — so
+            // without this stream a watch capture only appears after a tab
+            // switch. Imports also land seconds *after* foregrounding,
+            // which is why the activation refetch alone can't cover them.
+            // Refresh when an import event finishes cleanly (same
+            // observation pattern as SyncStatusMonitor; on a local-only
+            // store the notification simply never fires).
+            for await note in NotificationCenter.default.notifications(
+                named: NSPersistentCloudKitContainer.eventChangedNotification
+            ) {
+                let key = NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+                guard let event = note.userInfo?[key] as? NSPersistentCloudKitContainer.Event,
+                      event.type == .import, event.endDate != nil, event.error == nil
+                else { continue }
+                await refreshInitialWindow()
+            }
+        }
+    }
+
+    private var stackLayout: some View {
+        NavigationStack {
+            pathColumn
+        }
+        .sheet(item: $reflectingMoment, onDismiss: performPendingDelete) { moment in
+            ReflectSheet(
+                moment: moment,
+                draft: $reflectionDraft,
+                presentation: .sheet,
+                onDismiss: { reflectingMoment = nil },
+                onDelete: {
+                    pendingDelete = moment
+                    reflectingMoment = nil
+                }
+            )
+        }
+    }
+
+    private var splitLayout: some View {
+        NavigationStack {
+            Group {
+                if #available(iOS 27.1, *) {
+                    ArrangementView {
+                        pathColumnContent
+                            .splitArrangementLayoutSize(minWidth: 300, idealWidth: 340, maxWidth: 420)
+                    } secondary: {
+                        reflectPane
+                    }
+                    // Both axes: side by side when wider than tall, list above
+                    // editor when taller than wide, and whichever keeps both
+                    // halves clear of the fold when the device is part-open.
+                    // A 50/50 horizontal split in portrait would leave the
+                    // editor ~330pt wide, too narrow for its prompt and
+                    // footer; stacking gives it the full width instead.
+                    .arrangementViewStyle(.split)
+                } else {
+                    // Regular width below iOS 27.1 means a landscape Pro Max:
+                    // a plain two-column split, no fold to adapt to.
+                    HStack(spacing: 0) {
+                        pathColumnContent
+                            .frame(maxWidth: 420)
+                        Divider()
+                        reflectPane
+                    }
+                }
+            }
+            .modifier(PathNavigationChrome(status: syncMonitor.status))
+        }
+    }
+
+    /// The reflection editor for the selected moment, or a quiet resting state.
+    private var reflectPane: some View {
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            if let moment = reflectingMoment {
+                ReflectSheet(
+                    moment: moment,
+                    draft: $reflectionDraft,
+                    presentation: .pane,
+                    onDismiss: { reflectingMoment = nil },
+                    onDelete: {
+                        // Clear the pane first so it never renders a deleted
+                        // model; the delete lands on the next turn of the run
+                        // loop.
+                        reflectingMoment = nil
+                        Task { @MainActor in
+                            await Task.yield()
+                            delete(moment)
+                        }
+                    }
+                )
+                // Fresh editor per moment so transient state (the delete
+                // confirmation) never carries over when the selection changes.
+                // The draft itself is reseeded in beginReflecting(on:).
+                .id(moment.id)
+            } else {
+                reflectPlaceholder
+            }
+        }
+    }
+
+    private var pathColumn: some View {
+        pathColumnContent
+            .modifier(PathNavigationChrome(status: syncMonitor.status))
+    }
+
+    private var pathColumnContent: some View {
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            content
+        }
+    }
+
+    /// Detail-pane resting state when no moment is selected. Quiet by design:
+    /// an invitation in the product's voice, not an instruction panel.
+    private var reflectPlaceholder: some View {
+        VStack(spacing: CairnSpacing.size3) {
+            Image(systemName: "pencil")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(Color.cairnTextTertiary)
+                .accessibilityHidden(true)
+            Text("Choose a moment to sit with it")
+                .font(.cairnSerif(size: 20, weight: .light))
+                .foregroundStyle(Color.cairnTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(CairnSpacing.size8)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -249,9 +401,9 @@ struct TimelineView: View {
                 Section {
                     ForEach(grouped[day] ?? [], id: \.id) { moment in
                         TimelineEntry(moment: moment) {
-                            reflectingMoment = moment
+                            beginReflecting(on: moment)
                         }
-                        .listRowBackground(swipeRowBackground)
+                        .listRowBackground(rowBackground(isSelected: isShowingInPane(moment)))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 delete(moment)
@@ -309,14 +461,20 @@ struct TimelineView: View {
     /// the trash button when swipe-to-delete reveals it. The inset-grouped section
     /// already clips the leading side to its rounded card outline; matching the
     /// trailing side here keeps the shape coherent across the swipe reveal.
-    private var swipeRowBackground: some View {
+    private func rowBackground(isSelected: Bool) -> some View {
         UnevenRoundedRectangle(
             topLeadingRadius: 0,
             bottomLeadingRadius: 0,
             bottomTrailingRadius: CairnRadii.medium,
             topTrailingRadius: CairnRadii.medium
         )
-        .fill(Color.cairnSurfaceCard)
+        .fill(isSelected ? Color.cairnSage50 : Color.cairnSurfaceCard)
+    }
+
+    /// Only the split layout keeps a persistent selection worth marking; in
+    /// the compact layout the sheet covers the list, so no row is highlighted.
+    private func isShowingInPane(_ moment: Moment) -> Bool {
+        usesSplitLayout && reflectingMoment?.id == moment.id
     }
 
     private var emptyState: some View {
@@ -367,8 +525,9 @@ struct TimelineView: View {
         MomentTimelineFetcher.defaultPageSize
     }
 
-    /// Fires on first appear, tab switch back to Path, and every ModelContext.didSave
-    /// while Path is visible. Replaces the loaded slice wholesale with a fresh
+    /// Fires on first appear, tab switch back to Path, scene activation, every
+    /// ModelContext.didSave, and every completed CloudKit import while Path is
+    /// visible. Replaces the loaded slice wholesale with a fresh
     /// consistent snapshot from the store — so remote deletes propagate (a stale
     /// merge-and-carry-forward strategy would leave deleted rows on screen), and
     /// future-dated arrivals (device clock skew, imports) still surface (a `.now`
@@ -446,6 +605,11 @@ struct TimelineView: View {
         )) ?? 0
     }
 
+    private func beginReflecting(on moment: Moment) {
+        reflectionDraft = moment.reflection ?? ""
+        reflectingMoment = moment
+    }
+
     private func performPendingDelete() {
         guard let moment = pendingDelete else { return }
         pendingDelete = nil
@@ -462,7 +626,46 @@ struct TimelineView: View {
     }
 }
 
-#Preview {
+/// Title and sync pip for the Path screen. Shared by the compact stack and the
+/// split layout, where the one navigation bar belongs to the stack that wraps
+/// the arrangement, not to either column.
+private struct PathNavigationChrome: ViewModifier {
+    let status: SyncStatus
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle("Path")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Path")
+                        .font(.cairnTitle)
+                        .foregroundStyle(Color.cairnTextPrimary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SyncStatusPip(status: status)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+#Preview("Seeded") {
+    TimelineView()
+        .modelContainer(PreviewSeed.container())
+        .environment(SyncStatusMonitor(backing: .inMemory))
+}
+
+#Preview("Seeded, reflecting") {
+    let container = PreviewSeed.container()
+    let newestFirst = FetchDescriptor<Moment>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+    let moment = (try? container.mainContext.fetch(newestFirst))?.first
+    return TimelineView(initialReflectingMoment: moment)
+        .modelContainer(container)
+        .environment(SyncStatusMonitor(backing: .inMemory))
+}
+
+#Preview("Empty") {
     TimelineView()
         .modelContainer(for: Moment.self, inMemory: true)
         .environment(SyncStatusMonitor(backing: .inMemory))

@@ -56,6 +56,8 @@ struct RemindersView: View {
                 .padding(.horizontal, CairnSpacing.gutter)
                 .padding(.top, CairnSpacing.size3)
                 .padding(.bottom, CairnSpacing.size10)
+                .frame(maxWidth: CairnLayout.readableWidth)
+                .frame(maxWidth: .infinity)
             }
         }
         .navigationTitle("Reminders")

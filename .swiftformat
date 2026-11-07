@@ -14,6 +14,8 @@
 
 # Enabled by default since SwiftFormat 0.62; conflict with existing repo style
 # (single-line if bodies, regular comments on non-API declarations).
---disable wrapIfStatementBodies,docComments
+# repeatedGuard (0.64) would merge consecutive early-return guards; the repo
+# keeps one guard per condition for readability.
+--disable wrapIfStatementBodies,docComments,repeatedGuard
 
 --exclude .build,build,DerivedData,**/.build,Packages/*/.build,**/Generated

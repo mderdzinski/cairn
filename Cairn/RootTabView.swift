@@ -142,30 +142,22 @@ struct RootTabView: View {
     }
 
     private var tabs: some View {
+        // `tabItem` is soft-deprecated in the iOS 27 SDK; `Tab` is its
+        // replacement. Every tab carries a symbol because iPhone Duo renders
+        // the bar vertically and icon-only on the outer display.
         TabView(selection: $selection) {
-            CaptureView(onSeePath: { route(to: .path) })
-                .tabItem {
-                    Label("Capture", systemImage: "plus")
-                }
-                .tag(CairnTab.capture)
-
-            TimelineView()
-                .tabItem {
-                    Label("Path", systemImage: "mountain.2")
-                }
-                .tag(CairnTab.path)
-
-            PatternsView()
-                .tabItem {
-                    Label("Patterns", systemImage: "chart.bar")
-                }
-                .tag(CairnTab.patterns)
-
-            SettingsView(onRoute: route(to:))
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .tag(CairnTab.settings)
+            Tab("Capture", systemImage: "plus", value: CairnTab.capture) {
+                CaptureView(onSeePath: { route(to: .path) })
+            }
+            Tab("Path", systemImage: "mountain.2", value: CairnTab.path) {
+                TimelineView()
+            }
+            Tab("Patterns", systemImage: "chart.bar", value: CairnTab.patterns) {
+                PatternsView()
+            }
+            Tab("Settings", systemImage: "gearshape", value: CairnTab.settings) {
+                SettingsView(onRoute: route(to:))
+            }
         }
     }
 
@@ -229,7 +221,7 @@ struct RootTabView: View {
 
 #Preview("Default") {
     RootTabView(remindersService: RemindersService())
-        .modelContainer(for: Moment.self, inMemory: true)
+        .modelContainer(PreviewSeed.container())
         .environment(SyncStatusMonitor(backing: .inMemory))
 }
 

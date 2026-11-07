@@ -3,18 +3,40 @@ import SwiftData
 import SwiftUI
 
 struct ReflectSheet: View {
+    /// Where the reflection editor is hosted. The same editor serves both: a
+    /// bottom sheet over the Path list in a compact column (phone, Duo closed)
+    /// and the detail pane beside it when the column is regular width (Duo
+    /// open), so the hierarchy stays the same across poses and only the
+    /// container changes.
+    enum Presentation {
+        case sheet
+        case pane
+    }
+
     let moment: Moment
+    /// The in-progress reflection text. Owned by the presenting view, not by
+    /// this one, so the draft survives when the editor is rebuilt in a
+    /// different container (sheet to pane, or back) as the size class changes
+    /// mid-edit. The owner seeds it from `moment.reflection` on selection.
+    @Binding var editingText: String
+    let presentation: Presentation
     let onDismiss: () -> Void
     let onDelete: () -> Void
 
-    @State private var editingText: String
     @State private var showingDeleteConfirmation = false
 
-    init(moment: Moment, onDismiss: @escaping () -> Void, onDelete: @escaping () -> Void) {
+    init(
+        moment: Moment,
+        draft: Binding<String>,
+        presentation: Presentation = .sheet,
+        onDismiss: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) {
         self.moment = moment
+        _editingText = draft
+        self.presentation = presentation
         self.onDismiss = onDismiss
         self.onDelete = onDelete
-        _editingText = State(initialValue: moment.reflection ?? "")
     }
 
     private var hasUnsavedChanges: Bool {
@@ -22,9 +44,45 @@ struct ReflectSheet: View {
     }
 
     var body: some View {
+        editor
+            .confirmationDialog(
+                "Delete this moment?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete moment", role: .destructive) {
+                    onDelete()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This can't be undone.")
+            }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        switch presentation {
+        case .sheet:
+            form
+                .background(Color.cairnSurfaceOverlay)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(.thinMaterial)
+                .interactiveDismissDisabled(hasUnsavedChanges)
+        case .pane:
+            // No navigation chrome of its own: the pane lives inside the Path
+            // stack's arrangement, and that stack owns the one navigation bar.
+            form
+                .background(Color.cairnPaper.ignoresSafeArea())
+        }
+    }
+
+    private var form: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                handle
+                if presentation == .sheet {
+                    handle
+                }
                 header
                     .padding(.bottom, CairnSpacing.size5)
                 prompt
@@ -38,25 +96,10 @@ struct ReflectSheet: View {
             .padding(.horizontal, CairnSpacing.size5)
             .padding(.top, CairnSpacing.size3)
             .padding(.bottom, CairnSpacing.size12)
+            .frame(maxWidth: CairnLayout.readableWidth)
+            .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color.cairnSurfaceOverlay)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(.thinMaterial)
-        .interactiveDismissDisabled(hasUnsavedChanges)
-        .confirmationDialog(
-            "Delete this moment?",
-            isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete moment", role: .destructive) {
-                onDelete()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This can't be undone.")
-        }
     }
 
     private var handle: some View {
@@ -124,8 +167,18 @@ struct ReflectSheet: View {
 
     private var footer: some View {
         HStack(spacing: CairnSpacing.size3) {
-            Button("Skip for now") { onDismiss() }
-                .buttonStyle(CairnButtonStyle(.ghost))
+            Button { onDismiss() } label: {
+                Text("Skip for now")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .buttonStyle(CairnButtonStyle(.ghost))
+            // Keep the label whole: next to the block-width primary button
+            // the HStack otherwise shaves a point or two off this one and
+            // truncates it (seen in the stacked split on iPhone Duo's inner
+            // display in portrait). Fixing the label's width and giving the
+            // button layout priority settles the allocation.
+            .layoutPriority(1)
             Button(action: save) {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")

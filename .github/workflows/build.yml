@@ -14,7 +14,10 @@ concurrency:
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: macos-26
+    # xcode-27: the only hosted image with Xcode 27.1+ (iOS 27.1 SDK), which
+    # iPhone Duo support requires. Its iOS 27.1 runtime ships the iPhone Duo
+    # simulator, so the device picker below lands on it.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
 

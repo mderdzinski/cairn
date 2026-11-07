@@ -8,6 +8,7 @@ struct CaptureView: View {
     let onSeePath: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastCaptured: MomentCategory?
@@ -48,21 +49,21 @@ struct CaptureView: View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
             sageBackdrop
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.top, CairnSpacing.size2)
-                Spacer(minLength: CairnSpacing.size8)
-                grid
-                Spacer(minLength: CairnSpacing.size6)
-                footer(todayCount: todayCount)
+            if horizontalSizeClass == .regular, #available(iOS 27.1, *) {
+                arrangedLayout(todayCount: todayCount)
+            } else {
+                fittedColumn(todayCount: todayCount, showsHeader: true)
+                    .frame(maxWidth: CairnLayout.readableWidth)
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, CairnSpacing.gutter)
-            .padding(.bottom, CairnSpacing.size6)
 
             if let category = lastCaptured {
                 MarkedToast(category: category)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 88)
+                    // The safe area already clears the tab bar wherever the
+                    // system puts it (bottom on a phone, the side on Duo's outer
+                    // display), so only a breathing margin is needed here.
+                    .padding(.bottom, CairnSpacing.size4)
                     .motionAwareTransition(
                         .opacity.combined(with: .move(edge: .bottom)),
                         reduceMotion: reduceMotion
@@ -70,6 +71,66 @@ struct CaptureView: View {
             }
         }
         .task { feedback.prepare() }
+    }
+
+    /// Regular width (iPhone Duo open, landscape poses): the prompt and the
+    /// chips become the two halves of a split arrangement. Fully open in
+    /// portrait that reads like the single column; in landscape the prompt
+    /// takes the leading side and the chips the trailing side; and when the
+    /// device is partially folded the system keeps each half clear of the
+    /// hinge, so the chips land whole in the lower half instead of having a
+    /// row cut by the fold.
+    @available(iOS 27.1, *)
+    private func arrangedLayout(todayCount: Int) -> some View {
+        ArrangementView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, CairnSpacing.gutter)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } secondary: {
+            fittedColumn(todayCount: todayCount, showsHeader: false)
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    /// The column at descending chip sizes; the first that fits the available
+    /// height wins. The outer display of iPhone Duo is shorter than any phone
+    /// this layout was tuned for (678pt tall with the bars on the side), and a
+    /// fixed-size column of large chips overflowed it, clipping the eyebrow
+    /// off the top. A scrolling column is the floor so nothing is ever
+    /// unreachable.
+    private func fittedColumn(todayCount: Int, showsHeader: Bool) -> some View {
+        ViewThatFits(in: .vertical) {
+            column(todayCount: todayCount, chipSize: .large, showsHeader: showsHeader)
+            column(todayCount: todayCount, chipSize: .medium, showsHeader: showsHeader)
+            // Small chips are still comfortably tappable and let the grid plus
+            // footer fit the lower half of a partially folded Duo without
+            // scrolling under the tab bar.
+            column(todayCount: todayCount, chipSize: .small, showsHeader: showsHeader)
+            ScrollView {
+                column(todayCount: todayCount, chipSize: .small, showsHeader: showsHeader)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private func column(todayCount: Int, chipSize: ChipSize, showsHeader: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if showsHeader {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: chipSize == .large ? CairnSpacing.size8 : CairnSpacing.size4)
+            }
+            grid(chipSize: chipSize)
+            Spacer(minLength: chipSize == .large ? CairnSpacing.size6 : CairnSpacing.size3)
+            footer(todayCount: todayCount)
+        }
+        .padding(.horizontal, CairnSpacing.gutter)
+        .padding(.top, showsHeader ? 0 : CairnSpacing.size4)
+        .padding(.bottom, CairnSpacing.size6)
     }
 
     /// Re-derive the start-of-today boundary. Assigning only when it actually changed
@@ -95,15 +156,22 @@ struct CaptureView: View {
         }
     }
 
-    private var grid: some View {
+    /// Two columns, always: an even count lets the grid split cleanly at the
+    /// fold when Duo is partially open. The chips grow and shrink with the
+    /// column; they never stretch into a third column.
+    private func grid(chipSize: ChipSize) -> some View {
         LazyVGrid(columns: columns, spacing: CairnSpacing.size3) {
             ForEach(MomentCategory.allCases, id: \.self) { category in
-                MomentChip(category: category, size: .large) {
+                MomentChip(category: category, size: chipSize) {
                     capture(category)
                 }
             }
         }
-        .frame(maxHeight: .infinity)
+        // On a regular-width column the two chip columns would drift to the
+        // far edges; keep them within a hand's reach of each other and let
+        // the header and footer own the full width.
+        .frame(maxWidth: CairnLayout.chipGridWidth)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func footer(todayCount: Int) -> some View {
