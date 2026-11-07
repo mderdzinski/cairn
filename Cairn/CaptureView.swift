@@ -8,6 +8,7 @@ struct CaptureView: View {
     let onSeePath: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastCaptured: MomentCategory?
@@ -48,22 +49,13 @@ struct CaptureView: View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
             sageBackdrop
-            // The outer display of iPhone Duo is shorter than any phone this
-            // layout was tuned for (678pt tall with the bars on the side), and a
-            // fixed-size column of large chips overflowed it, clipping the
-            // eyebrow off the top. Offer the column at descending chip sizes and
-            // let the first one that fits the available height win; a scrolling
-            // column is the floor so nothing is ever unreachable.
-            ViewThatFits(in: .vertical) {
-                column(todayCount: todayCount, chipSize: .large)
-                column(todayCount: todayCount, chipSize: .medium)
-                ScrollView {
-                    column(todayCount: todayCount, chipSize: .medium)
-                }
-                .scrollBounceBehavior(.basedOnSize)
+            if horizontalSizeClass == .regular, #available(iOS 27.1, *) {
+                arrangedLayout(todayCount: todayCount)
+            } else {
+                fittedColumn(todayCount: todayCount, showsHeader: true)
+                    .frame(maxWidth: CairnLayout.readableWidth)
+                    .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: CairnLayout.readableWidth)
-            .frame(maxWidth: .infinity)
 
             if let category = lastCaptured {
                 MarkedToast(category: category)
@@ -81,16 +73,63 @@ struct CaptureView: View {
         .task { feedback.prepare() }
     }
 
-    private func column(todayCount: Int, chipSize: ChipSize) -> some View {
+    /// Regular width (iPhone Duo open, landscape poses): the prompt and the
+    /// chips become the two halves of a split arrangement. Fully open in
+    /// portrait that reads like the single column; in landscape the prompt
+    /// takes the leading side and the chips the trailing side; and when the
+    /// device is partially folded the system keeps each half clear of the
+    /// hinge, so the chips land whole in the lower half instead of having a
+    /// row cut by the fold.
+    @available(iOS 27.1, *)
+    private func arrangedLayout(todayCount: Int) -> some View {
+        ArrangementView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, CairnSpacing.gutter)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } secondary: {
+            fittedColumn(todayCount: todayCount, showsHeader: false)
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    /// The column at descending chip sizes; the first that fits the available
+    /// height wins. The outer display of iPhone Duo is shorter than any phone
+    /// this layout was tuned for (678pt tall with the bars on the side), and a
+    /// fixed-size column of large chips overflowed it, clipping the eyebrow
+    /// off the top. A scrolling column is the floor so nothing is ever
+    /// unreachable.
+    private func fittedColumn(todayCount: Int, showsHeader: Bool) -> some View {
+        ViewThatFits(in: .vertical) {
+            column(todayCount: todayCount, chipSize: .large, showsHeader: showsHeader)
+            column(todayCount: todayCount, chipSize: .medium, showsHeader: showsHeader)
+            // Small chips are still comfortably tappable and let the grid plus
+            // footer fit the lower half of a partially folded Duo without
+            // scrolling under the tab bar.
+            column(todayCount: todayCount, chipSize: .small, showsHeader: showsHeader)
+            ScrollView {
+                column(todayCount: todayCount, chipSize: .small, showsHeader: showsHeader)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private func column(todayCount: Int, chipSize: ChipSize, showsHeader: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-                .padding(.top, CairnSpacing.size2)
-            Spacer(minLength: chipSize == .large ? CairnSpacing.size8 : CairnSpacing.size4)
+            if showsHeader {
+                header
+                    .padding(.top, CairnSpacing.size2)
+                Spacer(minLength: chipSize == .large ? CairnSpacing.size8 : CairnSpacing.size4)
+            }
             grid(chipSize: chipSize)
-            Spacer(minLength: chipSize == .large ? CairnSpacing.size6 : CairnSpacing.size4)
+            Spacer(minLength: chipSize == .large ? CairnSpacing.size6 : CairnSpacing.size3)
             footer(todayCount: todayCount)
         }
         .padding(.horizontal, CairnSpacing.gutter)
+        .padding(.top, showsHeader ? 0 : CairnSpacing.size4)
         .padding(.bottom, CairnSpacing.size6)
     }
 
