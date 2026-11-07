@@ -48,21 +48,30 @@ struct CaptureView: View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
             sageBackdrop
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.top, CairnSpacing.size2)
-                Spacer(minLength: CairnSpacing.size8)
-                grid
-                Spacer(minLength: CairnSpacing.size6)
-                footer(todayCount: todayCount)
+            // The outer display of iPhone Duo is shorter than any phone this
+            // layout was tuned for (678pt tall with the bars on the side), and a
+            // fixed-size column of large chips overflowed it, clipping the
+            // eyebrow off the top. Offer the column at descending chip sizes and
+            // let the first one that fits the available height win; a scrolling
+            // column is the floor so nothing is ever unreachable.
+            ViewThatFits(in: .vertical) {
+                column(todayCount: todayCount, chipSize: .large)
+                column(todayCount: todayCount, chipSize: .medium)
+                ScrollView {
+                    column(todayCount: todayCount, chipSize: .medium)
+                }
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(.horizontal, CairnSpacing.gutter)
-            .padding(.bottom, CairnSpacing.size6)
+            .frame(maxWidth: CairnLayout.readableWidth)
+            .frame(maxWidth: .infinity)
 
             if let category = lastCaptured {
                 MarkedToast(category: category)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 88)
+                    // The safe area already clears the tab bar wherever the
+                    // system puts it (bottom on a phone, the side on Duo's outer
+                    // display), so only a breathing margin is needed here.
+                    .padding(.bottom, CairnSpacing.size4)
                     .motionAwareTransition(
                         .opacity.combined(with: .move(edge: .bottom)),
                         reduceMotion: reduceMotion
@@ -70,6 +79,19 @@ struct CaptureView: View {
             }
         }
         .task { feedback.prepare() }
+    }
+
+    private func column(todayCount: Int, chipSize: ChipSize) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding(.top, CairnSpacing.size2)
+            Spacer(minLength: chipSize == .large ? CairnSpacing.size8 : CairnSpacing.size4)
+            grid(chipSize: chipSize)
+            Spacer(minLength: chipSize == .large ? CairnSpacing.size6 : CairnSpacing.size4)
+            footer(todayCount: todayCount)
+        }
+        .padding(.horizontal, CairnSpacing.gutter)
+        .padding(.bottom, CairnSpacing.size6)
     }
 
     /// Re-derive the start-of-today boundary. Assigning only when it actually changed
@@ -95,10 +117,13 @@ struct CaptureView: View {
         }
     }
 
-    private var grid: some View {
+    /// Two columns, always: an even count lets the grid split cleanly at the
+    /// fold when Duo is partially open. The chips grow and shrink with the
+    /// column; they never stretch into a third column.
+    private func grid(chipSize: ChipSize) -> some View {
         LazyVGrid(columns: columns, spacing: CairnSpacing.size3) {
             ForEach(MomentCategory.allCases, id: \.self) { category in
-                MomentChip(category: category, size: .large) {
+                MomentChip(category: category, size: chipSize) {
                     capture(category)
                 }
             }

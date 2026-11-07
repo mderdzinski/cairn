@@ -21,6 +21,17 @@ public enum CairnSpacing {
     public static let watchGutter: CGFloat = 16
 }
 
+/// Layout bounds shared by the phone screens. iPhone Duo's inner display (and
+/// landscape poses) hand a single-column screen far more width than a phone
+/// column was designed for; capping the readable column keeps line lengths and
+/// card proportions honest instead of stretching paper edge to edge.
+public enum CairnLayout {
+    /// Maximum width of a single-column content stack (header + cards + list).
+    /// Sits just above the Duo inner display's portrait content width (669pt
+    /// minus gutters), so it only bites in landscape and on wider canvases.
+    public static let readableWidth: CGFloat = 640
+}
+
 public enum CairnRadii {
     public static let small: CGFloat = 8
     public static let medium: CGFloat = 12

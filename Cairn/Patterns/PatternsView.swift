@@ -48,6 +48,7 @@ private struct PatternsContent: View {
     let dayStart: Date
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var moments: [Moment]
     @State private var hasAnyMoments: Bool = true
     @State private var digest: PatternsDigest?
@@ -71,13 +72,25 @@ private struct PatternsContent: View {
                     emptyState
                 } else if let digest {
                     WeeklyTotalCard(digest: digest)
-                    RhythmCard(daily: digest.daily, range: range)
-                    BreakdownCard(breakdown: digest.breakdown)
+                    if horizontalSizeClass == .regular {
+                        // Two cards abreast on a regular-width column (iPhone
+                        // Duo open): an even split that also divides cleanly
+                        // at the fold.
+                        HStack(alignment: .top, spacing: CairnSpacing.size5) {
+                            RhythmCard(daily: digest.daily, range: range)
+                            BreakdownCard(breakdown: digest.breakdown)
+                        }
+                    } else {
+                        RhythmCard(daily: digest.daily, range: range)
+                        BreakdownCard(breakdown: digest.breakdown)
+                    }
                 }
             }
             .padding(.horizontal, CairnSpacing.size5)
             .padding(.top, CairnSpacing.size3)
             .padding(.bottom, CairnSpacing.size12)
+            .frame(maxWidth: CairnLayout.readableWidth)
+            .frame(maxWidth: .infinity)
         }
         .scrollContentBackground(.hidden)
         .task(id: DigestKey(count: moments.count, last: moments.first?.timestamp, range: range, day: dayStart)) {

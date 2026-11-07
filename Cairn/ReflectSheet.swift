@@ -3,15 +3,32 @@ import SwiftData
 import SwiftUI
 
 struct ReflectSheet: View {
+    /// Where the reflection editor is hosted. The same editor serves both: a
+    /// bottom sheet over the Path list in a compact column (phone, Duo closed)
+    /// and the detail pane beside it when the column is regular width (Duo
+    /// open), so the hierarchy stays the same across poses and only the
+    /// container changes.
+    enum Presentation {
+        case sheet
+        case pane
+    }
+
     let moment: Moment
+    let presentation: Presentation
     let onDismiss: () -> Void
     let onDelete: () -> Void
 
     @State private var editingText: String
     @State private var showingDeleteConfirmation = false
 
-    init(moment: Moment, onDismiss: @escaping () -> Void, onDelete: @escaping () -> Void) {
+    init(
+        moment: Moment,
+        presentation: Presentation = .sheet,
+        onDismiss: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) {
         self.moment = moment
+        self.presentation = presentation
         self.onDismiss = onDismiss
         self.onDelete = onDelete
         _editingText = State(initialValue: moment.reflection ?? "")
@@ -22,9 +39,52 @@ struct ReflectSheet: View {
     }
 
     var body: some View {
+        editor
+            .confirmationDialog(
+                "Delete this moment?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete moment", role: .destructive) {
+                    onDelete()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This can't be undone.")
+            }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        switch presentation {
+        case .sheet:
+            form
+                .background(Color.cairnSurfaceOverlay)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(.thinMaterial)
+                .interactiveDismissDisabled(hasUnsavedChanges)
+        case .pane:
+            form
+                .background(Color.cairnPaper.ignoresSafeArea())
+                .navigationTitle("Reflect")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Reflect")
+                            .font(.cairnTitle)
+                            .foregroundStyle(Color.cairnTextPrimary)
+                    }
+                }
+        }
+    }
+
+    private var form: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                handle
+                if presentation == .sheet {
+                    handle
+                }
                 header
                     .padding(.bottom, CairnSpacing.size5)
                 prompt
@@ -38,25 +98,10 @@ struct ReflectSheet: View {
             .padding(.horizontal, CairnSpacing.size5)
             .padding(.top, CairnSpacing.size3)
             .padding(.bottom, CairnSpacing.size12)
+            .frame(maxWidth: CairnLayout.readableWidth)
+            .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color.cairnSurfaceOverlay)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(.thinMaterial)
-        .interactiveDismissDisabled(hasUnsavedChanges)
-        .confirmationDialog(
-            "Delete this moment?",
-            isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete moment", role: .destructive) {
-                onDelete()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This can't be undone.")
-        }
     }
 
     private var handle: some View {
