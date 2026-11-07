@@ -221,7 +221,7 @@ struct RootTabView: View {
 
 #Preview("Default") {
     RootTabView(remindersService: RemindersService())
-        .modelContainer(for: Moment.self, inMemory: true)
+        .modelContainer(PreviewSeed.container())
         .environment(SyncStatusMonitor(backing: .inMemory))
 }
 

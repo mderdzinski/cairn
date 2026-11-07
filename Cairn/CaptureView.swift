@@ -128,7 +128,11 @@ struct CaptureView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity)
+        // On a regular-width column the two chip columns would drift to the
+        // far edges; keep them within a hand's reach of each other and let
+        // the header and footer own the full width.
+        .frame(maxWidth: CairnLayout.chipGridWidth)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func footer(todayCount: Int) -> some View {

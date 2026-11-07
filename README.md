@@ -34,7 +34,7 @@ Packages/CairnCore/        shared Swift package (model + aggregates)
 
 ## Building
 
-- Xcode 26.5 or newer, iOS 18 and watchOS 11 SDK.
+- Xcode 27.1 or newer (iOS 27.1 SDK: required for the iPhone Duo layouts), watchOS 26 SDK.
 - Fork the repo, open `Cairn.xcodeproj`, and change `DEVELOPMENT_TEAM` in the pbxproj to your own Apple Developer Team ID.
 - Cairn uses CloudKit. First run will register a container under your team.
 

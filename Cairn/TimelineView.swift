@@ -35,15 +35,21 @@ struct TimelineView: View {
     @State private var dayStart = Calendar.current.startOfDay(for: .now)
 
     @State private var reflectingMoment: Moment?
+    /// Preview hook: the moment to show in the reflection pane/sheet from the
+    /// first frame. The app never passes one; it exists so the split layout can
+    /// be rendered with a selection on the Duo inner display.
+    private let initialReflectingMoment: Moment?
+
+    init(initialReflectingMoment: Moment? = nil) {
+        self.initialReflectingMoment = initialReflectingMoment
+        _reflectingMoment = State(initialValue: initialReflectingMoment)
+    }
+
     /// A delete requested from inside the ReflectSheet, deferred until the
     /// sheet's dismissal animation completes. Deleting immediately leaves the
     /// sheet rendering a deleted PersistentModel for ~0.3s — a crash window if
     /// autosave or the didSave refresh fires mid-animation.
     @State private var pendingDelete: Moment?
-    /// Split-layout column state. Starts with both columns showing so the
-    /// reflection pane is visible the moment Duo opens, not hidden behind a
-    /// sidebar toggle.
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     /// Regular width (iPhone Duo open, landscape poses) gets the list and the
     /// reflection editor side by side — one more level of hierarchy on the
@@ -51,6 +57,13 @@ struct TimelineView: View {
     /// list with the editor as a bottom sheet. All data state lives on this
     /// view, so folding or unfolding swaps the container without losing the
     /// loaded window, scroll position, or the moment being reflected on.
+    ///
+    /// Not a `NavigationSplitView`: on Duo's inner display in portrait (669pt
+    /// wide) that collapses to a detail-only column behind a sidebar toggle at
+    /// any sidebar width, which is exactly the hidden hierarchy Apple's
+    /// guidance warns against. An `ArrangementView` keeps both halves on
+    /// screen and moves them to either side of the fold when the device is
+    /// partially open.
     private var usesSplitLayout: Bool {
         horizontalSizeClass == .regular
     }
@@ -150,56 +163,75 @@ struct TimelineView: View {
     }
 
     private var splitLayout: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            pathColumn
-                .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 420)
-        } detail: {
-            ZStack {
-                Color.cairnPaper.ignoresSafeArea()
-                if let moment = reflectingMoment {
-                    ReflectSheet(
-                        moment: moment,
-                        presentation: .pane,
-                        onDismiss: { reflectingMoment = nil },
-                        onDelete: {
-                            // Clear the pane first so it never renders a
-                            // deleted model; the delete lands on the next
-                            // turn of the run loop.
-                            reflectingMoment = nil
-                            Task { @MainActor in
-                                await Task.yield()
-                                delete(moment)
-                            }
-                        }
-                    )
-                    // Fresh editor state per moment: the draft text must not
-                    // carry over when the selection changes.
-                    .id(moment.id)
+        NavigationStack {
+            Group {
+                if #available(iOS 27.1, *) {
+                    ArrangementView {
+                        pathColumnContent
+                            .splitArrangementLayoutSize(minWidth: 300, idealWidth: 340, maxWidth: 420)
+                    } secondary: {
+                        reflectPane
+                    }
+                    // Both axes: side by side when wider than tall, list above
+                    // editor when taller than wide, and whichever keeps both
+                    // halves clear of the fold when the device is part-open.
+                    // A 50/50 horizontal split in portrait would leave the
+                    // editor ~330pt wide, too narrow for its prompt and
+                    // footer; stacking gives it the full width instead.
+                    .arrangementViewStyle(.split)
                 } else {
-                    reflectPlaceholder
+                    // Regular width below iOS 27.1 means a landscape Pro Max:
+                    // a plain two-column split, no fold to adapt to.
+                    HStack(spacing: 0) {
+                        pathColumnContent
+                            .frame(maxWidth: 420)
+                        Divider()
+                        reflectPane
+                    }
                 }
             }
+            .modifier(PathNavigationChrome(status: syncMonitor.status))
         }
-        .navigationSplitViewStyle(.balanced)
+    }
+
+    /// The reflection editor for the selected moment, or a quiet resting state.
+    private var reflectPane: some View {
+        ZStack {
+            Color.cairnPaper.ignoresSafeArea()
+            if let moment = reflectingMoment {
+                ReflectSheet(
+                    moment: moment,
+                    presentation: .pane,
+                    onDismiss: { reflectingMoment = nil },
+                    onDelete: {
+                        // Clear the pane first so it never renders a deleted
+                        // model; the delete lands on the next turn of the run
+                        // loop.
+                        reflectingMoment = nil
+                        Task { @MainActor in
+                            await Task.yield()
+                            delete(moment)
+                        }
+                    }
+                )
+                // Fresh editor state per moment: the draft text must not carry
+                // over when the selection changes.
+                .id(moment.id)
+            } else {
+                reflectPlaceholder
+            }
+        }
     }
 
     private var pathColumn: some View {
+        pathColumnContent
+            .modifier(PathNavigationChrome(status: syncMonitor.status))
+    }
+
+    private var pathColumnContent: some View {
         ZStack {
             Color.cairnPaper.ignoresSafeArea()
             content
-        }
-        .navigationTitle("Path")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Path")
-                    .font(.cairnTitle)
-                    .foregroundStyle(Color.cairnTextPrimary)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                SyncStatusPip(status: syncMonitor.status)
-                    .allowsHitTesting(false)
-            }
         }
     }
 
@@ -578,7 +610,45 @@ struct TimelineView: View {
     }
 }
 
-#Preview {
+/// Title and sync pip for the Path screen. Shared by the compact stack and the
+/// split layout, where the one navigation bar belongs to the stack that wraps
+/// the arrangement, not to either column.
+private struct PathNavigationChrome: ViewModifier {
+    let status: SyncStatus
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle("Path")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Path")
+                        .font(.cairnTitle)
+                        .foregroundStyle(Color.cairnTextPrimary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SyncStatusPip(status: status)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+#Preview("Seeded") {
+    TimelineView()
+        .modelContainer(PreviewSeed.container())
+        .environment(SyncStatusMonitor(backing: .inMemory))
+}
+
+#Preview("Seeded, reflecting") {
+    let container = PreviewSeed.container()
+    let moment = (try? container.mainContext.fetch(FetchDescriptor<Moment>()))?.first
+    return TimelineView(initialReflectingMoment: moment)
+        .modelContainer(container)
+        .environment(SyncStatusMonitor(backing: .inMemory))
+}
+
+#Preview("Empty") {
     TimelineView()
         .modelContainer(for: Moment.self, inMemory: true)
         .environment(SyncStatusMonitor(backing: .inMemory))

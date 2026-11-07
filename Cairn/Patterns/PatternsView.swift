@@ -176,7 +176,12 @@ private struct PatternsContent: View {
     }
 }
 
-#Preview {
+#Preview("Seeded") {
+    PatternsView()
+        .modelContainer(PreviewSeed.container())
+}
+
+#Preview("Empty") {
     PatternsView()
         .modelContainer(for: Moment.self, inMemory: true)
 }

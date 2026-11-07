@@ -30,6 +30,10 @@ public enum CairnLayout {
     /// Sits just above the Duo inner display's portrait content width (669pt
     /// minus gutters), so it only bites in landscape and on wider canvases.
     public static let readableWidth: CGFloat = 640
+    /// Maximum width of the two-column capture grid. Wider than any phone
+    /// column (so it never bites there), narrower than the inner display so
+    /// the chips stay close together instead of hugging opposite edges.
+    public static let chipGridWidth: CGFloat = 460
 }
 
 public enum CairnRadii {

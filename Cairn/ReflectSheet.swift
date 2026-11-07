@@ -65,17 +65,10 @@ struct ReflectSheet: View {
                 .presentationBackground(.thinMaterial)
                 .interactiveDismissDisabled(hasUnsavedChanges)
         case .pane:
+            // No navigation chrome of its own: the pane lives inside the Path
+            // stack's arrangement, and that stack owns the one navigation bar.
             form
                 .background(Color.cairnPaper.ignoresSafeArea())
-                .navigationTitle("Reflect")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Text("Reflect")
-                            .font(.cairnTitle)
-                            .foregroundStyle(Color.cairnTextPrimary)
-                    }
-                }
         }
     }
 
@@ -171,6 +164,10 @@ struct ReflectSheet: View {
         HStack(spacing: CairnSpacing.size3) {
             Button("Skip for now") { onDismiss() }
                 .buttonStyle(CairnButtonStyle(.ghost))
+                // Keep the label whole: the block-width primary button next to
+                // it would otherwise squeeze this one into truncation on wide
+                // columns (seen on iPhone Duo's inner display in portrait).
+                .fixedSize()
             Button(action: save) {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")
