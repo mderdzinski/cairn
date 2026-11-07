@@ -35,6 +35,13 @@ struct TimelineView: View {
     @State private var dayStart = Calendar.current.startOfDay(for: .now)
 
     @State private var reflectingMoment: Moment?
+    /// The reflection being typed for `reflectingMoment`. Owned here rather
+    /// than by the editor: crossing the compact/regular boundary mid-edit
+    /// (folding or unfolding a Duo, rotating a Pro Max) swaps the sheet for
+    /// the pane and rebuilds the editor, and a draft held in its own @State
+    /// would be thrown away with it. Seeded from the moment's saved
+    /// reflection whenever a selection begins.
+    @State private var reflectionDraft = ""
     /// Preview hook: the moment to show in the reflection pane/sheet from the
     /// first frame. The app never passes one; it exists so the split layout can
     /// be rendered with a selection on the Duo inner display.
@@ -43,6 +50,7 @@ struct TimelineView: View {
     init(initialReflectingMoment: Moment? = nil) {
         self.initialReflectingMoment = initialReflectingMoment
         _reflectingMoment = State(initialValue: initialReflectingMoment)
+        _reflectionDraft = State(initialValue: initialReflectingMoment?.reflection ?? "")
     }
 
     /// A delete requested from inside the ReflectSheet, deferred until the
@@ -152,6 +160,7 @@ struct TimelineView: View {
         .sheet(item: $reflectingMoment, onDismiss: performPendingDelete) { moment in
             ReflectSheet(
                 moment: moment,
+                draft: $reflectionDraft,
                 presentation: .sheet,
                 onDismiss: { reflectingMoment = nil },
                 onDelete: {
@@ -201,6 +210,7 @@ struct TimelineView: View {
             if let moment = reflectingMoment {
                 ReflectSheet(
                     moment: moment,
+                    draft: $reflectionDraft,
                     presentation: .pane,
                     onDismiss: { reflectingMoment = nil },
                     onDelete: {
@@ -214,8 +224,9 @@ struct TimelineView: View {
                         }
                     }
                 )
-                // Fresh editor state per moment: the draft text must not carry
-                // over when the selection changes.
+                // Fresh editor per moment so transient state (the delete
+                // confirmation) never carries over when the selection changes.
+                // The draft itself is reseeded in beginReflecting(on:).
                 .id(moment.id)
             } else {
                 reflectPlaceholder
@@ -390,7 +401,7 @@ struct TimelineView: View {
                 Section {
                     ForEach(grouped[day] ?? [], id: \.id) { moment in
                         TimelineEntry(moment: moment) {
-                            reflectingMoment = moment
+                            beginReflecting(on: moment)
                         }
                         .listRowBackground(rowBackground(isSelected: isShowingInPane(moment)))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -592,6 +603,11 @@ struct TimelineView: View {
         recentUnreflectedCount = (try? modelContext.fetchCount(
             MomentTimelineFetcher.unreflectedRecentCountDescriptor()
         )) ?? 0
+    }
+
+    private func beginReflecting(on moment: Moment) {
+        reflectionDraft = moment.reflection ?? ""
+        reflectingMoment = moment
     }
 
     private func performPendingDelete() {

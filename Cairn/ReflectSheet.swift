@@ -14,24 +14,29 @@ struct ReflectSheet: View {
     }
 
     let moment: Moment
+    /// The in-progress reflection text. Owned by the presenting view, not by
+    /// this one, so the draft survives when the editor is rebuilt in a
+    /// different container (sheet to pane, or back) as the size class changes
+    /// mid-edit. The owner seeds it from `moment.reflection` on selection.
+    @Binding var editingText: String
     let presentation: Presentation
     let onDismiss: () -> Void
     let onDelete: () -> Void
 
-    @State private var editingText: String
     @State private var showingDeleteConfirmation = false
 
     init(
         moment: Moment,
+        draft: Binding<String>,
         presentation: Presentation = .sheet,
         onDismiss: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
         self.moment = moment
+        _editingText = draft
         self.presentation = presentation
         self.onDismiss = onDismiss
         self.onDelete = onDelete
-        _editingText = State(initialValue: moment.reflection ?? "")
     }
 
     private var hasUnsavedChanges: Bool {
