@@ -23,7 +23,8 @@ struct IntroScreen: View {
                             .padding(.horizontal, CairnSpacing.gutter)
                             .onboardingEntrance(delay: 0.18)
                     }
-                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
+                    .onboardingColumn()
+                    .frame(minHeight: geo.size.height, alignment: .center)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -32,6 +33,7 @@ struct IntroScreen: View {
                     .padding(.horizontal, CairnSpacing.gutter)
                     .padding(.top, CairnSpacing.size3)
                     .padding(.bottom, CairnSpacing.size6)
+                    .onboardingColumn()
                     .background(Color.cairnPaper)
             }
 

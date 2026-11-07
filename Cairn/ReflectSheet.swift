@@ -179,7 +179,14 @@ struct ReflectSheet: View {
             // display in portrait). Fixing the label's width and giving the
             // button layout priority settles the allocation.
             .layoutPriority(1)
-            Button(action: save) {
+            // A closure rather than `action: save`: Xcode's preview
+            // instrumentation wraps every argument in a generic
+            // `__designTimeSelection`, and a bare method reference there is
+            // ambiguous between its View and non-View overloads, which broke
+            // every #Preview in this file.
+            Button {
+                save()
+            } label: {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")
                         .accessibilityHidden(true)
@@ -208,4 +215,16 @@ struct ReflectSheet: View {
         let timePart = date.formatted(date: .omitted, time: .shortened)
         return "\(dayPart) · \(timePart)"
     }
+}
+
+#Preview("Pane") {
+    @Previewable @State var draft = "A slow walk home. Nothing needed fixing."
+    ReflectSheet(
+        moment: Moment(timestamp: .now, category: .contentment, reflection: nil),
+        draft: $draft,
+        presentation: .pane,
+        onDismiss: {},
+        onDelete: {}
+    )
+    .modelContainer(for: Moment.self, inMemory: true)
 }
