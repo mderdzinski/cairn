@@ -642,7 +642,8 @@ private struct PathNavigationChrome: ViewModifier {
 
 #Preview("Seeded, reflecting") {
     let container = PreviewSeed.container()
-    let moment = (try? container.mainContext.fetch(FetchDescriptor<Moment>()))?.first
+    let newestFirst = FetchDescriptor<Moment>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+    let moment = (try? container.mainContext.fetch(newestFirst))?.first
     return TimelineView(initialReflectingMoment: moment)
         .modelContainer(container)
         .environment(SyncStatusMonitor(backing: .inMemory))
