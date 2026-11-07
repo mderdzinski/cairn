@@ -162,12 +162,18 @@ struct ReflectSheet: View {
 
     private var footer: some View {
         HStack(spacing: CairnSpacing.size3) {
-            Button("Skip for now") { onDismiss() }
-                .buttonStyle(CairnButtonStyle(.ghost))
-                // Keep the label whole: the block-width primary button next to
-                // it would otherwise squeeze this one into truncation on wide
-                // columns (seen on iPhone Duo's inner display in portrait).
-                .fixedSize()
+            Button { onDismiss() } label: {
+                Text("Skip for now")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .buttonStyle(CairnButtonStyle(.ghost))
+            // Keep the label whole: next to the block-width primary button
+            // the HStack otherwise shaves a point or two off this one and
+            // truncates it (seen in the stacked split on iPhone Duo's inner
+            // display in portrait). Fixing the label's width and giving the
+            // button layout priority settles the allocation.
+            .layoutPriority(1)
             Button(action: save) {
                 HStack(spacing: CairnSpacing.size2) {
                     Image(systemName: "checkmark")
