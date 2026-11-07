@@ -72,7 +72,7 @@ final class CairnUITests: XCTestCase {
         // gate. Simulator launches in CI can be slow — generous timeout to avoid
         // flakes when the suite warms up.
         XCTAssertTrue(
-            app.tabBars.buttons["Capture"].waitForExistence(timeout: 15),
+            tabButton("Capture", in: app).waitForExistence(timeout: 15),
             "Tab bar should be visible after launch with onboarding seeded"
         )
 
@@ -88,7 +88,7 @@ final class CairnUITests: XCTestCase {
         // The toast's lifetime is brief (~1.3s) and we don't need to confirm it
         // visually to know the capture landed — Path will show the moment whether
         // or not we observed the toast. Skip straight to verifying persistence.
-        app.tabBars.buttons["Path"].tap()
+        tabButton("Path", in: app).tap()
 
         // The Today section header is the simplest anchor that proves the timeline
         // rendered something — the empty state shows "No moments yet" instead.
@@ -101,5 +101,21 @@ final class CairnUITests: XCTestCase {
             app.staticTexts["No moments yet"].exists,
             "Path should not be in its empty state after a capture"
         )
+    }
+
+    /// The tab bar button titled `title`, wherever the system placed the tab
+    /// bar. On iPhone Duo's outer display (and its inner display in landscape)
+    /// iOS renders the tab bar as a vertical side bar, which XCUITest exposes
+    /// as a Toolbar rather than a TabBar; the buttons keep their titles.
+    private func tabButton(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        let tabBarOrSideBar = NSPredicate(
+            format: "elementType == %ld OR elementType == %ld",
+            Int(XCUIElement.ElementType.tabBar.rawValue),
+            Int(XCUIElement.ElementType.toolbar.rawValue)
+        )
+        return app.descendants(matching: .any)
+            .matching(tabBarOrSideBar)
+            .buttons[title]
+            .firstMatch
     }
 }
