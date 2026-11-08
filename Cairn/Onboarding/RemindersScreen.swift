@@ -42,7 +42,8 @@ struct RemindersScreen: View {
                         .padding(.horizontal, CairnSpacing.gutter)
                         .onboardingEntrance(delay: 0.16)
                     }
-                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
+                    .onboardingColumn()
+                    .frame(minHeight: geo.size.height, alignment: .center)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -57,6 +58,7 @@ struct RemindersScreen: View {
                 .padding(.horizontal, CairnSpacing.gutter)
                 .padding(.top, CairnSpacing.size3)
                 .padding(.bottom, CairnSpacing.size6)
+                .onboardingColumn()
                 .background(Color.cairnPaper)
             }
         }

@@ -34,6 +34,12 @@ public enum CairnLayout {
     /// column (so it never bites there), narrower than the inner display so
     /// the chips stay close together instead of hugging opposite edges.
     public static let chipGridWidth: CGFloat = 460
+    /// Maximum width of a single-purpose flow column (onboarding): one
+    /// illustration or prompt, a short stack of controls, and a block button.
+    /// Wide enough for the two-column chip grid, narrow enough that a block
+    /// button on the Duo inner display still reads as a button rather than a
+    /// bar across the whole screen.
+    public static let flowColumnWidth: CGFloat = 480
 }
 
 public enum CairnRadii {

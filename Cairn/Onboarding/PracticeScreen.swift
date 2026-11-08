@@ -34,7 +34,8 @@ struct PracticeScreen: View {
                         .padding(.horizontal, CairnSpacing.gutter)
                         .onboardingEntrance(delay: 0.2)
                     }
-                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .center)
+                    .onboardingColumn()
+                    .frame(minHeight: geo.size.height, alignment: .center)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -45,6 +46,7 @@ struct PracticeScreen: View {
                         .padding(.horizontal, CairnSpacing.gutter)
                         .padding(.bottom, CairnSpacing.size6)
                 }
+                .onboardingColumn()
                 .background(Color.cairnPaper)
             }
 

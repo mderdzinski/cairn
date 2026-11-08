@@ -56,6 +56,7 @@ struct VocabularyScreen: View {
                         .motionAwareTransition(.opacity, reduceMotion: reduceMotion)
                 }
                 .padding(.horizontal, CairnSpacing.gutter)
+                .onboardingColumn()
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
@@ -65,6 +66,7 @@ struct VocabularyScreen: View {
                         .padding(.horizontal, CairnSpacing.gutter)
                         .padding(.bottom, CairnSpacing.size6)
                 }
+                .onboardingColumn()
                 .background(Color.cairnPaper)
             }
 
