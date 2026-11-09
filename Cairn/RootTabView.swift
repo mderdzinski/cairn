@@ -210,6 +210,7 @@ struct RootTabView: View {
         case "capture": route(to: .capture)
         case "path": route(to: .path)
         case "patterns": route(to: .patterns)
+        case "settings": route(to: .settings)
         default: break
         }
     }

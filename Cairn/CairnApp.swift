@@ -34,11 +34,14 @@ struct CairnApp: App {
         do {
             result = try MomentStore.makeContainer(
                 cloudKitContainerID: "iCloud.com.markderdzinski.Cairn",
-                inMemory: isUnderXCTest || isUITestRun
+                inMemory: isUnderXCTest || isUITestRun || DemoLaunch.isSeeded
             )
         } catch {
             // Both CloudKit and local persistence failed — genuinely unrecoverable.
             fatalError("Failed to create Cairn ModelContainer: \(error)")
+        }
+        if DemoLaunch.isSeeded {
+            PreviewSeed.seed(into: result.container.mainContext)
         }
         storeResult = result
         _syncMonitor = State(wrappedValue: SyncStatusMonitor(backing: result.backing))
@@ -50,11 +53,12 @@ struct CairnApp: App {
     /// `-cairn.uitest.reset` leaves it at that (next launch behaves like a fresh
     /// install; onboarding will show). `-cairn.uitest.seedOnboardingSeen` adds
     /// the `cairn.hasSeenOnboarding = true` write on top so a test can skip past
-    /// onboarding without inheriting stale reminder settings.
+    /// onboarding without inheriting stale reminder settings. The screenshot
+    /// launch (`DemoLaunch`) takes the same path as the latter.
     private static func applyUITestLaunchArgumentsIfPresent() {
         let args = CommandLine.arguments
         let isReset = args.contains("-cairn.uitest.reset")
-        let isSeedOnboardingSeen = args.contains("-cairn.uitest.seedOnboardingSeen")
+        let isSeedOnboardingSeen = args.contains("-cairn.uitest.seedOnboardingSeen") || DemoLaunch.isSeeded
         guard isReset || isSeedOnboardingSeen else { return }
 
         let defaults = UserDefaults.standard

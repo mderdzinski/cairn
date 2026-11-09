@@ -21,6 +21,10 @@ struct CaptureView: View {
     /// into a query at init — so it can be re-derived when the day rolls over while the
     /// app sits resident in the background. See refreshToday().
     @State private var todayStart = Calendar.current.startOfDay(for: .now)
+    /// Whether iPhone Duo is part-folded (the book or laptop pose). Only then
+    /// does the open display need the hinge-aware split in portrait.
+    @State private var isPartiallyFolded = false
+    @State private var isPortrait = true
 
     init(onSeePath: @escaping () -> Void = {}) {
         self.onSeePath = onSeePath
@@ -50,11 +54,18 @@ struct CaptureView: View {
             Color.cairnPaper.ignoresSafeArea()
             sageBackdrop
             if horizontalSizeClass == .regular, #available(iOS 27.1, *) {
-                arrangedLayout(todayCount: todayCount)
+                Group {
+                    if isPortrait, !isPartiallyFolded {
+                        singleColumn(todayCount: todayCount)
+                    } else {
+                        arrangedLayout(todayCount: todayCount)
+                    }
+                }
+                .onHingeChange { _, context in
+                    isPartiallyFolded = context.hinge?.status == .partiallyOpen
+                }
             } else {
-                fittedColumn(todayCount: todayCount, showsHeader: true)
-                    .frame(maxWidth: CairnLayout.readableWidth)
-                    .frame(maxWidth: .infinity)
+                singleColumn(todayCount: todayCount)
             }
 
             if let category = lastCaptured {
@@ -70,16 +81,26 @@ struct CaptureView: View {
                     )
             }
         }
+        .onGeometryChange(for: Bool.self) { $0.size.height >= $0.size.width } action: { isPortrait = $0 }
         .task { feedback.prepare() }
     }
 
-    /// Regular width (iPhone Duo open, landscape poses): the prompt and the
-    /// chips become the two halves of a split arrangement. Fully open in
-    /// portrait that reads like the single column; in landscape the prompt
-    /// takes the leading side and the chips the trailing side; and when the
-    /// device is partially folded the system keeps each half clear of the
-    /// hinge, so the chips land whole in the lower half instead of having a
-    /// row cut by the fold.
+    /// The phone layout: prompt, chips and footer in one column. iPhone Duo
+    /// uses it too when it is open flat in portrait, where the full height
+    /// leaves room for the largest chips.
+    private func singleColumn(todayCount: Int) -> some View {
+        fittedColumn(todayCount: todayCount, showsHeader: true)
+            .frame(maxWidth: CairnLayout.readableWidth)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// Regular width in landscape, or part-folded: the prompt and the chips
+    /// become the two halves of a split arrangement. In landscape the prompt
+    /// takes the leading side and the chips the trailing side; part-folded,
+    /// the system keeps each half clear of the hinge, so the chips land whole
+    /// in the lower half instead of having a row cut by the fold. Open flat
+    /// in portrait the split would squeeze the chips into half the height,
+    /// so that pose uses the single column instead.
     @available(iOS 27.1, *)
     private func arrangedLayout(todayCount: Int) -> some View {
         ArrangementView {

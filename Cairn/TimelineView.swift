@@ -545,6 +545,10 @@ struct TimelineView: View {
             )) ?? []
             moments = fresh
             hasReachedStart = fresh.count < pageSize
+            let demoWaiting = DemoLaunch.reflectsNewest ? fresh.first(where: { $0.reflection == nil }) : nil
+            if let demoWaiting, reflectingMoment == nil {
+                beginReflecting(on: demoWaiting)
+            }
             return
         }
 
